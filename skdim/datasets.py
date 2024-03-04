@@ -57,19 +57,22 @@ def hyperBall(n, d, radius=1.0, center=[], random_state=None):
     data: np.array, (npoints x ndim)
         Generated data
     """
-    random_state_ = check_random_state(random_state)
+    random_state = check_random_state(random_state)
+
+    vec = random_state.randn(n, d)
+    vec *= radius / np.linalg.norm(vec, axis=1)[:, None]
+
+    radial = random_state.rand(n, 1)
+    vec *= radial**(1/d)
+
     if center == []:
         center = np.array([0] * d)
-    r = radius
-    x = random_state_.normal(size=(n, d))
-    ssq = np.sum(x ** 2, axis=1)
-    fr = r * gammainc(d / 2, ssq / 2) ** (1 / d) / np.sqrt(ssq)
-    frtiled = np.tile(fr.reshape(n, 1), (1, d))
-    p = center + np.multiply(x, frtiled)
-    return p
+    vec = center + radius * vec
+
+    return vec
 
 
-def hyperSphere(n, d, random_state=None):
+def hyperSphere(n, d, radius=1.0, center=[], random_state=None):
     """
     Generates a sample from a uniform distribution on the hypersphere
 
@@ -79,6 +82,10 @@ def hyperSphere(n, d, random_state=None):
         Number of data points.
     d: int
         Dimension of the hypersphere
+    radius: float
+        Radius of the hypersphere
+    center: list, tuple, np.array
+        Center of the hypersphere
     random_state: int, np.random.RandomState instance
         Random number generator
 
@@ -88,8 +95,11 @@ def hyperSphere(n, d, random_state=None):
         Generated data
     """
     random_state = check_random_state(random_state)
+    if center == []:
+        center = np.array([0] * (d+1))
     vec = random_state.randn(n, d+1)
     vec /= np.linalg.norm(vec, axis=1)[:, None]
+    vec = center + radius * vec
     return vec
 
 
