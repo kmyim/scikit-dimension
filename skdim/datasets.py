@@ -256,6 +256,35 @@ def swissRoll3Sph(n_swiss, n_sphere, a=1, b=2, nturn=1.5, h=4, random_state=None
     return np.hstack((x[:, None], y[:, None], z[:, None], w[:, None]))
 
 
+def peano_curve(n, d=2, depth=2, random_state=None):
+    random_state = check_random_state(random_state)
+    #TODO
+    pass
+
+
+def product(n, sample_1, sample_1_kwargs, sample_2, sample_2_kwargs):
+    """Create a sample from a product using two methods in this module.
+
+    Parameters
+    n   int
+        number of points to sample
+    sample_1    method
+        function to create first sample
+    sample_1_kwargs dict
+        dictionary of arguments to pass to sample_1
+    sample_2    method
+        function to create first sample
+    sample_2_kwargs dict
+        dictionary of arguments to pass to sample_2
+    """
+    sample_1_kwargs.update({'n': n})
+    sample_2_kwargs.update({'n': n})
+    sample_1_points = sample_1(**sample_1_kwargs)
+    sample_2_points = sample_2(**sample_2_kwargs)
+
+    return np.hstack((sample_1_points, sample_2_points))
+
+
 class BenchmarkManifolds:
     """
     Generates a commonly used benchmark set of synthetic manifolds with known intrinsic dimension described by Hein et al. and Campadelli et al. [Campadelli2015]_
