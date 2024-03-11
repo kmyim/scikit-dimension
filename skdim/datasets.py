@@ -124,6 +124,7 @@ def hyperTwinPeaks(n, d=2, height=1.0, random_state=None):
         Generated data
     """
 
+    #TODO Need a uniform version of this one
     random_state = check_random_state(random_state)
     base_coord = random_state.uniform(size=(n, d))
     _height = height * np.prod(np.sin(2 * np.pi * base_coord), axis=1, keepdims=1)
