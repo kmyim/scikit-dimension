@@ -263,6 +263,19 @@ def peano_curve(n, d=2, depth=2, random_state=None):
     pass
 
 
+def toroidal_spiral(n, n_twists=20, r1=1.0, r2=0.25, random_state=None):
+    if not r1 > r2:
+        raise ValueError("The radii must satisfy r1 > r2.")
+    phi_sample = hyperBall(n=n, d=1, radius=2 * np.pi, random_state=random_state)
+    u = np.hstack((r1 * np.cos(phi_sample), r1 * np.sin(phi_sample), np.zeros([n, 1])))
+    v = r2 * (
+        np.cos(phi_sample * n_twists) * u
+        + np.sin(phi_sample * (n_twists))
+        * np.hstack((np.zeros([n, 2]), np.ones([n, 1])))
+    )
+    return u + v
+
+
 def product(n, sample_1, sample_1_kwargs, sample_2, sample_2_kwargs):
     """Create a sample from a product using two methods in this module.
 
