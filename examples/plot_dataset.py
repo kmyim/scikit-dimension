@@ -7,7 +7,7 @@ Code to quickly visualise a datset
 import skdim
 import matplotlib.pyplot as plt
 
-dataset = skdim.datasets.toroidal_spiral(n=1000, n_twists=25)
+dataset = skdim.datasets.hyperSphere(n=1000, d=3, radius=1)
 
 fig = plt.figure(figsize=(10, 5))
 ax = fig.add_subplot(projection='3d')
