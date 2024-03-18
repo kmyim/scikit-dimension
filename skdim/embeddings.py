@@ -52,8 +52,14 @@ def linear():
     pass
 
 
-def radial_basis_function():
-    pass
+def radial_basis_function(data, n_functions=None):
+    input_dimension = np.shape(data)[1]
+    if not n_functions:
+        n_functions = input_dimension
+    landmarks = data[np.random.choice(data.shape[0], n_functions, replace=False), :]
+    #TODO Define function using distances from landmarks
+
+    raise NotImplementedError
 
 
 def kernel_trick():
