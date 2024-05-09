@@ -33,7 +33,7 @@ import numpy as np
 import pandas as pd
 from sklearn.utils.validation import check_random_state
 from scipy.special import gammainc
-
+import matplotlib.pyplot as plt
 
 def hyperBall(n, d, radius=1.0, center=[], random_state=None):
     """
@@ -297,6 +297,44 @@ def product(n, sample_1, sample_1_kwargs, sample_2, sample_2_kwargs):
     sample_2_points = sample_2(**sample_2_kwargs)
 
     return np.hstack((sample_1_points, sample_2_points))
+
+def dumbbell(n, connecting_radius=0.1, ramdom_state=None):
+    """Create a sample from a PL model of a 2-dimensional dumbell in R^3e.
+
+    Parameters
+    n   int
+        number of points to sample
+    connecting_radius    float
+        radius of the connecting tube
+    random_state: int, np.random.RandomState instance
+        Random number generator
+    """
+    def profile_function(x):
+        """ Defines a dumbbell shape on [-1.0, 1.0] with radius 0.5 at the ends and connecting_radius at the connecting bar."""
+        outer_x = 0.4
+        inner_x = 0.4
+        outer_slope = 0.5 / outer_x
+        inner_slope = (0.5 - connecting_radius) / inner_x
+
+        out_of_bounds_message=f"The dumbbell is only defined between -1.0 and 1.0 but {x} was passed."
+
+        if x<-1.0:
+            raise ValueError(out_of_bounds_message)
+        elif x<-1.0 + outer_x:
+            return outer_slope * (x + 1.0)
+        elif x<-1.0 + outer_x + inner_x:
+            return 0.5 - inner_slope * (x + 1.0 - outer_x)
+        elif x<1.0 - outer_x - inner_x:
+            return connecting_radius
+        elif x<1.0 - outer_x:
+            return connecting_radius + inner_slope * (x - 1.0 + outer_x + inner_x)
+        elif x<=1.0:
+            return 0.5  - outer_slope * (x - 1.0 + outer_x)
+        else:
+            raise ValueError(out_of_bounds_message)
+
+    dumbbell_surface = SurfaceOfRevolution(profile_function, random_state=ramdom_state)
+    return dumbbell_surface.sample_points(n_points=n)
 
 
 class BenchmarkManifolds:
@@ -736,3 +774,102 @@ class BenchmarkManifolds:
         # Create the final dataset:
         data = np.concatenate([temp1, temp2, temp1, temp2], axis=1)
         return data
+
+class SurfaceOfRevolution:
+    """Implementation of surfaces of revolution."""
+    def __init__(self, func, how="x", xmin=-1.0, xmax=1.0, random_state=None):
+        """
+        Create a surface of revolution which is symmetric around the x-axix.
+
+        :param func: a callable which is the real-valued function to be rotated, y=f(x)
+        :param how: a string indicating which axis to rotate the graph around, default is "x"
+        :param xmin: the left boundary of the surface
+        :param xmax: the right boundary of the surface
+        """
+        if not xmin < xmax:
+            raise ValueError("The variable xmin must be less than xmax")
+        if not how in ["x", "y"]:
+            raise ValueError("The variable how must be 'x' or 'y'.")
+        self.func = func
+        self.how = how
+        self.xmin = xmin
+        self.xmax = xmax
+        self.random_state = check_random_state(random_state)
+        (
+            self.xvals,
+            self.fvals,
+            self.f_prime_vals,
+            self.jacobian_vals,
+        ) = self._fetch_function_values()
+
+    def plot_curve(self):
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        if self.how == "x":
+            ax.scatter(self.xvals, self.fvals, c="r", marker="o")
+            ax.scatter(self.xvals, self.jacobian_vals, c="g", marker="o")
+        else:
+            ax.scatter(self.fvals, self.xvals, c="r", marker="o")
+            ax.scatter(self.fvals, self.jacobian_vals, c="g", marker="o")
+        plt.show()
+
+    def _fetch_function_values(self):
+        """
+        Calculate the values of the function, the derivative and the Jacobian on a discrete grid.
+        The results are stored in class variables.
+        If how="y" then f_prime_vals = dx/dy and jacobian_vals are the derivatives of the inverse function
+        :return xvals: the discrete grid of x-values
+        :return fvals: the accompanying values of the function
+        :return f_prime_vals: the values of the derivative dy/dx at each point, unless "how"="y", when it is dx/dy
+        :return jacobian_vals: the scale of the volume element in terms of dx dtheta at x, or dy dtheta if "how"="y"
+        """
+        number_intervals = 20000
+        xvals = np.linspace(self.xmin, self.xmax, number_intervals + 1)
+        fvals = np.array([self.func(x) for x in xvals])
+        if np.min(fvals) < 0:
+            print(
+                "Warning: the function describing the surface of revolution has negative values"
+            )
+
+        if self.how == "x":
+            f_prime_vals = np.gradient(fvals, xvals)
+            jacobian_vals = fvals * np.sqrt(1 + np.square(f_prime_vals))
+        else:
+            f_prime_vals = -1 / np.gradient(fvals, xvals)
+            jacobian_vals = xvals * np.sqrt(1 + np.square(f_prime_vals))
+
+        return xvals, fvals, f_prime_vals, jacobian_vals
+
+    def sample_points(self, n_points=10000):
+        """
+        Sample n points from the surface of revolution.
+        :param n_points: the number of points to sample
+        :return: an array of shape (n, 3), the sampled points.
+        """
+        jac_max = np.max(self.jacobian_vals)
+        jac_min = np.min(self.jacobian_vals)
+        if jac_min < jac_max:
+            accepted_x = []
+            while len(accepted_x) < n_points:
+                points_to_calculate = n_points - len(accepted_x)
+                generated_x = self.random_state.uniform(
+                    self.xmin, self.xmax, size=points_to_calculate
+                )
+                jacobian = np.interp(generated_x, self.xvals, self.jacobian_vals)
+                rejection_parameter = np.random.uniform(0, jac_max, points_to_calculate)
+                accepted_x = np.concatenate(
+                    [accepted_x, generated_x[rejection_parameter < jacobian]]
+                )
+        else:
+            accepted_x = self.random_state.uniform(self.xmin, self.xmax, size=n_points)
+        theta = np.random.uniform(0, 2 * np.pi, n_points)
+        f = np.interp(accepted_x, self.xvals, self.fvals)
+
+        if self.how == "x":
+            y = f * np.cos(theta)
+            z = f * np.sin(theta)
+            return np.stack((accepted_x, y, z), axis=1)
+        else:
+            x = accepted_x * np.cos(theta)
+            z = accepted_x * np.sin(theta)
+            return np.stack((x, f, z), axis=1)
