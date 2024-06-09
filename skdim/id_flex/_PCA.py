@@ -32,8 +32,7 @@
 import numpy as np
 from sklearn.decomposition import PCA
 from sklearn.utils.validation import check_array
-from sklearn.utils.parallel import Parallel, delayed
-from joblib import effective_n_jobs
+from .._commonfuncs import GlobalEstimator
 from .._commonfuncs import FlexNbhdEstimator
 
 
@@ -54,10 +53,10 @@ class lPCA(FlexNbhdEstimator):
     ver: str, default='FO'
         Version. Possible values: 'FO', 'Fan', 'maxgap','ratio', 'Kaiser', 'broken_stick'.
     alphaRatio: float in (0,1)
-        Only for ver = 'ratio'. ID is estimated to be
+        Only for ver = 'ratio'. ID is estimated to be 
         the number of principal components needed to retain at least alphaRatio of the variance.
     alphaFO: float in (0,1)
-        Only for ver = 'FO'. An eigenvalue is considered significant
+        Only for ver = 'FO'. An eigenvalue is considered significant 
         if it is larger than alpha times the largest eigenvalue.
     alphaFan: float
         Only for ver = 'Fan'. The alpha parameter (large gap threshold).
@@ -67,9 +66,9 @@ class lPCA(FlexNbhdEstimator):
         Only for ver = 'Fan'. Total covariance in non-noise.
     verbose: bool, default=False
     fit_explained_variance: bool, default=False
-        If True, lPCA.fit(X) expects as input
+        If True, lPCA.fit(X) expects as input 
         a precomputed explained_variance vector: X = sklearn.decomposition.PCA().fit(X).explained_variance_
-
+    
     Attributes
     ----------
     gap_pw_:
@@ -97,75 +96,55 @@ class lPCA(FlexNbhdEstimator):
         self.verbose = verbose
         self.fit_explained_variance = fit_explained_variance
 
-    def _fit(
-        self,
-        X,
-        nbhd_indices,
-        nbhd_type,
-        metric,
-        radial_dists,
-        radius=1.0,
-        n_neighbors=5,
-        n_jobs=None,
-    ):
 
-        if nbhd_type not in ["eps", "knn"]:
-            raise ValueError("Neighbourhood type should either be knn or eps.")
+    def _fit(self, X, nbhd_indices, nbhd_type, metric, radial_dists, radius = 1.0, n_neighbors = 5,):
+
+        if nbhd_type not in ['eps', 'knn']: raise ValueError('Neighbourhood type should either be knn or eps.')
 
         if self.fit_explained_variance:
             X = check_array(X, ensure_2d=False, ensure_min_samples=2)
         else:
             X = check_array(X, ensure_min_samples=2, ensure_min_features=2)
 
-        if effective_n_jobs(n_jobs) > 1:
-            with Parallel(n_jobs=n_jobs) as parallel:
-                # Asynchronously apply the `fit` function to each data point and collect the results
-                results = parallel(
-                    delayed(self._pcaLocalDimEst)(np.take(X, nbhd, 0))
-                    for nbhd in nbhd_indices
-                )
-            self.dimension_pw_ = np.array(result[0] for result in results)
-        else:
-            self.dimension_pw_ = np.array(
-                [self._pcaLocalDimEst(np.take(X, nbhd, 0))[0] for nbhd in nbhd_indices]
-            )
+        dims_and_gaps = [self._pcaLocalDimEst(X[nbhd]) for nbhd in nbhd_indices]
+
+        self.dimension_pw_, self.gap_pw_ = np.array([list_item[0] for list_item in dims_and_gaps]), np.array([list_item[1] for list_item in dims_and_gaps])
+
 
     def _pcaLocalDimEst(self, X):
-        N = X.shape[0]
-        if N > 0:
-            if self.fit_explained_variance:
-                explained_var = X
-            else:
-                pca = PCA().fit(X)
-                self.explained_var_ = explained_var = pca.explained_variance_
-
-            if self.ver == "FO":
-                return self._FO(explained_var)
-            elif self.ver == "Fan":
-                return self._fan(explained_var)
-            elif self.ver == "maxgap":
-                return self._maxgap(explained_var)
-            elif self.ver == "ratio":
-                return self._ratio(explained_var)
-            elif self.ver == "participation_ratio":
-                return self._participation_ratio(explained_var)
-            elif self.ver == "Kaiser":
-                return self._Kaiser(explained_var)
-            elif self.ver == "broken_stick":
-                return self._broken_stick(explained_var)
+        if self.fit_explained_variance:
+            explained_var = X
         else:
-            return np.nan, np.nan
+            pca = PCA().fit(X)
+            self.explained_var_ = explained_var = pca.explained_variance_
+
+        if self.ver == "FO":
+            return self._FO(explained_var)
+        elif self.ver == "Fan":
+            return self._fan(explained_var)
+        elif self.ver == "maxgap":
+            return self._maxgap(explained_var)
+        elif self.ver == "ratio":
+            return self._ratio(explained_var)
+        elif self.ver == "participation_ratio":
+            return self._participation_ratio(explained_var)
+        elif self.ver == "Kaiser":
+            return self._Kaiser(explained_var)
+        elif self.ver == "broken_stick":
+            return self._broken_stick(explained_var)
 
     def _FO(self, explained_var):
         de = sum(explained_var > (self.alphaFO * explained_var[0]))
         gaps = explained_var[:-1] / explained_var[1:]
         return de, gaps
 
+
     @staticmethod
     def _maxgap(explained_var):
         gaps = explained_var[:-1] / explained_var[1:]
         de = np.nanargmax(gaps) + 1
         return de, gaps
+
 
     def _ratio(self, explained_var):
         sumexp = np.cumsum(explained_var)
@@ -174,11 +153,13 @@ class lPCA(FlexNbhdEstimator):
         gaps = explained_var[:-1] / explained_var[1:]
         return de, gaps
 
+
     def _participation_ratio(self, explained_var):
-        PR = sum(explained_var) ** 2 / sum(explained_var**2)
+        PR = sum(explained_var) ** 2 / sum(explained_var ** 2)
         de = PR
         gaps = explained_var[:-1] / explained_var[1:]
         return de, gaps
+
 
     def _fan(self, explained_var):
         r = np.where(np.cumsum(explained_var) / sum(explained_var) > self.PFan)[0][0]
@@ -197,10 +178,12 @@ class lPCA(FlexNbhdEstimator):
         )
         return de, gaps
 
+
     def _Kaiser(self, explained_var):
         de = sum(explained_var > np.mean(explained_var))
         gaps = explained_var[:-1] / explained_var[1:]
         return de, gaps
+
 
     @staticmethod
     def _brokenstick_distribution(dim):
