@@ -13,5 +13,5 @@
             {"n_swiss": 1000, "n_sphere": 1000}
         ]
     },
-    "meta_params": { "ds_random_seed": 12345,  "n_repeats": 500}
+    "meta_params": { "ds_random_seed": 12345,  "n_repeats": 100}
 }

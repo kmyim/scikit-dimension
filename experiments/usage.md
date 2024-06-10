@@ -1,5 +1,9 @@
 # Experiment procedures
 
+Store experiment parameters as a `expt_name.json` file in `/expt_params`. Execute
+    python expt.py expt_name.json
+To run experiment. Output datafile in `/results` directory. 
+
 ## Datasets
 Should use the same dataset for all classifiers (exceptions?). They are listed in `datasets.json`.
 
@@ -46,12 +50,6 @@ To create an estimator:
 
     est_params = expt_params['est_params'][0] #parameters to instantiate data
     est_obj = est_cl(random_state = est_rng.integers(low = 0, high = 10**5, size = 1), **est_params)
-
-
-## Output
-
-We run the experiments 
-
 
 
 
