@@ -14,7 +14,7 @@ def data():
 
 @pytest.mark.parametrize("ver", VERSIONS)
 def test_lpca_results(data, ver):
-    assert skdim.id_flex.lPCA(ver=ver).fit(data, nbhd_type="eps", radius=2.0).dimension_ == 5
+    assert skdim.id_flex.lPCA(ver=ver).fit(data, nbhd_type="eps", radius=0.5).dimension_ == 5
 
 
 @pytest.mark.parametrize("ver", VERSIONS)
