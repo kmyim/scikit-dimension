@@ -112,26 +112,30 @@ class lPCA(FlexNbhdEstimator):
 
 
     def _pcaLocalDimEst(self, X):
-        if self.fit_explained_variance:
-            explained_var = X
-        else:
-            pca = PCA().fit(X)
-            self.explained_var_ = explained_var = pca.explained_variance_
+        N = X.shape[0]
+        if N > 0:
+            if self.fit_explained_variance:
+                explained_var = X
+            else:
+                pca = PCA().fit(X)
+                self.explained_var_ = explained_var = pca.explained_variance_
 
-        if self.ver == "FO":
-            return self._FO(explained_var)
-        elif self.ver == "Fan":
-            return self._fan(explained_var)
-        elif self.ver == "maxgap":
-            return self._maxgap(explained_var)
-        elif self.ver == "ratio":
-            return self._ratio(explained_var)
-        elif self.ver == "participation_ratio":
-            return self._participation_ratio(explained_var)
-        elif self.ver == "Kaiser":
-            return self._Kaiser(explained_var)
-        elif self.ver == "broken_stick":
-            return self._broken_stick(explained_var)
+            if self.ver == "FO":
+                return self._FO(explained_var)
+            elif self.ver == "Fan":
+                return self._fan(explained_var)
+            elif self.ver == "maxgap":
+                return self._maxgap(explained_var)
+            elif self.ver == "ratio":
+                return self._ratio(explained_var)
+            elif self.ver == "participation_ratio":
+                return self._participation_ratio(explained_var)
+            elif self.ver == "Kaiser":
+                return self._Kaiser(explained_var)
+            elif self.ver == "broken_stick":
+                return self._broken_stick(explained_var)
+        else:
+            return np.nan, np.nan
 
     def _FO(self, explained_var):
         de = sum(explained_var > (self.alphaFO * explained_var[0]))
