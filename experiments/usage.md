@@ -1,8 +1,10 @@
 # Experiment procedures
 
-Store experiment parameters as a `expt_name.json` file in `/expt_params`. Execute
+Prescribe experiment parameters with  `/expt_params/expt_name.json`. To run experiment, execute
+
     python expt.py expt_name.json
-To run experiment. Output datafile in `/results` directory. 
+
+Output datafile in `/results/expt_name.json` contains estimated dimensions. 
 
 ## Datasets
 Should use the same dataset for all classifiers (exceptions?). They are listed in `datasets.json`.
