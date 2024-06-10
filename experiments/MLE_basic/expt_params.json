@@ -1,0 +1,11 @@
+{
+    "est_name": "MLE_basic",
+    "est_params": 
+    [
+        {"nbhd_type": "knn", "metric": "euclidean", "n_neighbors": 5, "smooth": false},
+        {"nbhd_type": "knn", "metric": "euclidean", "n_neighbors": 10, "smooth": false},
+        {"nbhd_type": "eps", "metric": "euclidean", "radius": 0.75, "smooth": false},
+        {"nbhd_type": "eps", "metric": "euclidean", "radius": 1.0, "smooth": false}
+    ],
+    "meta_params": {"est_random_seed": 12345, "n_repeats": 500}
+}

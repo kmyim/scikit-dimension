@@ -1,0 +1,17 @@
+{
+    "datasets": {
+        "hyperSphere":[
+            {"n": 500, "d": 4},
+            {"n": 1000, "d": 4},
+            {"n": 500, "d": 8},
+            {"n": 1000, "d": 8}
+        ],
+        "swissRoll3Sph":[
+            {"n_swiss": 500, "n_sphere": 500},
+            {"n_swiss": 1000, "n_sphere": 500},
+            {"n_swiss": 500, "n_sphere": 1000},
+            {"n_swiss": 1000, "n_sphere": 1000}
+        ]
+    },
+    "meta_params": { "ds_random_seed": 12345,  "n_repeats": 500}
+}
