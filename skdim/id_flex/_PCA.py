@@ -53,10 +53,10 @@ class lPCA(FlexNbhdEstimator):
     ver: str, default='FO'
         Version. Possible values: 'FO', 'Fan', 'maxgap','ratio', 'Kaiser', 'broken_stick'.
     alphaRatio: float in (0,1)
-        Only for ver = 'ratio'. ID is estimated to be 
+        Only for ver = 'ratio'. ID is estimated to be
         the number of principal components needed to retain at least alphaRatio of the variance.
     alphaFO: float in (0,1)
-        Only for ver = 'FO'. An eigenvalue is considered significant 
+        Only for ver = 'FO'. An eigenvalue is considered significant
         if it is larger than alpha times the largest eigenvalue.
     alphaFan: float
         Only for ver = 'Fan'. The alpha parameter (large gap threshold).
@@ -66,9 +66,9 @@ class lPCA(FlexNbhdEstimator):
         Only for ver = 'Fan'. Total covariance in non-noise.
     verbose: bool, default=False
     fit_explained_variance: bool, default=False
-        If True, lPCA.fit(X) expects as input 
+        If True, lPCA.fit(X) expects as input
         a precomputed explained_variance vector: X = sklearn.decomposition.PCA().fit(X).explained_variance_
-    
+
     Attributes
     ----------
     gap_pw_:
@@ -96,20 +96,28 @@ class lPCA(FlexNbhdEstimator):
         self.verbose = verbose
         self.fit_explained_variance = fit_explained_variance
 
+    def _fit(
+        self,
+        X,
+        nbhd_indices,
+        nbhd_type,
+        metric,
+        radial_dists,
+        radius=1.0,
+        n_neighbors=5,
+    ):
 
-    def _fit(self, X, nbhd_indices, nbhd_type, metric, radial_dists, radius = 1.0, n_neighbors = 5,):
-
-        if nbhd_type not in ['eps', 'knn']: raise ValueError('Neighbourhood type should either be knn or eps.')
+        if nbhd_type not in ["eps", "knn"]:
+            raise ValueError("Neighbourhood type should either be knn or eps.")
 
         if self.fit_explained_variance:
             X = check_array(X, ensure_2d=False, ensure_min_samples=2)
         else:
             X = check_array(X, ensure_min_samples=2, ensure_min_features=2)
 
-        dims_and_gaps = [self._pcaLocalDimEst(X[nbhd]) for nbhd in nbhd_indices]
-
-        self.dimension_pw_, self.gap_pw_ = np.array([list_item[0] for list_item in dims_and_gaps]), np.array([list_item[1] for list_item in dims_and_gaps])
-
+        self.dimension_pw_ = np.array(
+            [self._pcaLocalDimEst(np.take(X, nbhd, 0))[0] for nbhd in nbhd_indices]
+        )
 
     def _pcaLocalDimEst(self, X):
         N = X.shape[0]
@@ -142,13 +150,11 @@ class lPCA(FlexNbhdEstimator):
         gaps = explained_var[:-1] / explained_var[1:]
         return de, gaps
 
-
     @staticmethod
     def _maxgap(explained_var):
         gaps = explained_var[:-1] / explained_var[1:]
         de = np.nanargmax(gaps) + 1
         return de, gaps
-
 
     def _ratio(self, explained_var):
         sumexp = np.cumsum(explained_var)
@@ -157,13 +163,11 @@ class lPCA(FlexNbhdEstimator):
         gaps = explained_var[:-1] / explained_var[1:]
         return de, gaps
 
-
     def _participation_ratio(self, explained_var):
-        PR = sum(explained_var) ** 2 / sum(explained_var ** 2)
+        PR = sum(explained_var) ** 2 / sum(explained_var**2)
         de = PR
         gaps = explained_var[:-1] / explained_var[1:]
         return de, gaps
-
 
     def _fan(self, explained_var):
         r = np.where(np.cumsum(explained_var) / sum(explained_var) > self.PFan)[0][0]
@@ -182,12 +186,10 @@ class lPCA(FlexNbhdEstimator):
         )
         return de, gaps
 
-
     def _Kaiser(self, explained_var):
         de = sum(explained_var > np.mean(explained_var))
         gaps = explained_var[:-1] / explained_var[1:]
         return de, gaps
-
 
     @staticmethod
     def _brokenstick_distribution(dim):
