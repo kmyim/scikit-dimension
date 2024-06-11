@@ -42,15 +42,16 @@ for ds in ds_names:
         dummy = dict()
         dummy['dataset_parameters'] = ds_params
         dimlist = np.zeros([len(expt_params['est_params']), n_repeats])
-
+        nanlist = np.zeros([len(expt_params['est_params']), n_repeats])
         for k in range(n_repeats):
             ds_obj = ds_cl(random_state = ds_random_seeds[idx][k], **ds_params)
             for jdx, est_params in enumerate(expt_params['est_params']): 
                 estimator = est_cl()
                 estimator.fit(X = ds_obj, **est_params)
                 dimlist[jdx][k] = estimator.dimension_
+                nanlist[jdx][k] = np.isnan(estimator.dimension_pw_).mean()
         
-        dummy['estimated_dim'] = (np.array([np.nanmean(dimlist, axis = -1), np.nanstd(dimlist, axis = -1)]).T).tolist()
+        dummy['estimated_dim'] = (np.array([np.nanmean(dimlist, axis = -1), np.nanstd(dimlist, axis = -1),np.mean(nanlist, axis = -1) ] ).T).tolist()
         results[ds].append(dummy)
 
 
