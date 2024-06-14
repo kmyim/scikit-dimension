@@ -1,9 +1,5 @@
-import inspect
 import numpy as np
-import scipy
 from .._commonfuncs import FlexNbhdEstimator
-from sklearn.metrics import DistanceMetric
-from ..errors import EstimatorFailure
 
 class CDim(FlexNbhdEstimator):
     '''
@@ -17,37 +13,32 @@ class CDim(FlexNbhdEstimator):
 
     def _fit(self, X, nbhd_indices, nbhd_type, metric, radial_dists, radius = 1.0, n_neighbors = 5,):
 
-        if nbhd_type not in ['eps', 'knn']: raise ValueError('Neighbourhood type should either be knn or eps.')
+        if nbhd_type not in ['knn']: raise ValueError('Neighbourhood type should be knn.')
 
-        self.dimension_pw_ = np.array([self._mle_formula(dlist, nbhd_type, radius) for dlist in radial_dists])
-
-
-    @staticmethod
-    def _get_nbhd_vectors(X, nbhd_indices):
-        X[nbhd_indices]
+        self.dimension_pw_ = np.array([self._local_cdim(X, idx, nbhd, n_neighbors) for idx, nbhd in enumerate(nbhd_indices)])
 
     @staticmethod
-    def _mle_formula(dlist, nbhd_type, radius):
-
-        N = len(dlist)
-        
-        if N > 0:
-            if nbhd_type != 'eps': # defaults to knn
-                radius = np.max(dlist)
-            
-            minv = N*np.log(radius)-np.sum(np.log(dlist))
-
-            if minv < 1e-9:
-                raise EstimatorFailure("MLE estimation diverges.")
-            else:
-                if nbhd_type == 'eps':
-                    return np.divide(N, minv)
-                else: #knn
-                    return np.divide(N-1,minv)
-        else:
-            return np.nan
-                
-
-
-        
-    
+    def _local_cdim(X, idx, nbhd, n_neighbors):
+        neighbors = np.take(X, nbhd, 0)
+        vectors = neighbors - X[idx]
+        norms = np.linalg.norm(vectors, axis=1)
+        vectors = np.take(vectors, np.argsort(norms), axis=0)
+        vectors = vectors * np.sign(np.tensordot(vectors, vectors[0], axes=1))[:, None]
+        T = np.matmul(vectors, vectors.T)
+        label_set = [[i] for i in range(n_neighbors)]
+        de = 0
+        while len(label_set) > 0:
+            de += 1
+            new_label_set = []
+            for label in label_set:
+                for i in range(n_neighbors):
+                    if i in label:
+                        continue
+                    for vec_idx in label:
+                        if T[i][vec_idx] >= 0:
+                            break
+                    else:
+                        new_label = label + [i]
+                        new_label_set.append(new_label)
+            label_set = new_label_set
+        return de
