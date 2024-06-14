@@ -12,6 +12,11 @@ def data():
     X[:, :5] = skdim.datasets.hyperBall(n=100, d=5, radius=1, random_state=0)
     return X
 
+@pytest.fixture
+def singleton_data():
+    X = np.zeros((1, 1))
+    return X
+
 @pytest.mark.parametrize("estim_class", estimators)
 def test_fit_unknown_neighborhood(estim_class, data):
     estimator = estim_class()
@@ -41,6 +46,12 @@ def test_get_neigh_unknown_metric(estim_class, data):
     estimator = estim_class()
     with pytest.raises(ValueError):
         estimator.get_neigh(data, metric="wrong_unknown_metric")
+
+@pytest.mark.parametrize("estim_class", estimators)
+def test_get_neigh_empty_nbhd(estim_class, singleton_data):
+    estimator = estim_class()
+    with pytest.raises(ValueError):
+        estimator.get_neigh(singleton_data, nbhd_type="eps")
 
 @pytest.mark.parametrize("estim_class", estimators)
 def test_aggregation_computes_global_dim(estim_class, data):
