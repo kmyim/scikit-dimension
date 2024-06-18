@@ -379,6 +379,9 @@ class FlexNbhdEstimator(BaseEstimator):
 
     """
 
+    def __init__(self):
+        self._sort_results = False
+
     @abstractmethod
     def _fit(self, X, nbhd_indices, nbhd_type, metric, radial_dists, **kwargs):
         """
@@ -498,8 +501,7 @@ class FlexNbhdEstimator(BaseEstimator):
             self.smooth(nbhd_indices, comb)
         return self
 
-    @staticmethod
-    def get_neigh(
+    def get_neigh(self,
         X, nbhd_type="knn", metric="euclidean", n_jobs=1, radius=1.0, n_neighbors=5
     ):
         """
@@ -523,7 +525,8 @@ class FlexNbhdEstimator(BaseEstimator):
 
         if nbhd_type == "eps":
             radial_dist, indices = neigh.radius_neighbors(
-                return_distance=True
+                return_distance=True,
+                sort_results=self._sort_results
             )  # Find eps-nearest neighbors of each data sample
         elif nbhd_type == "knn":
             radial_dist, indices = neigh.kneighbors(
