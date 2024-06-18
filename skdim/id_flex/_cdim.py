@@ -1,5 +1,7 @@
 import numpy as np
 from .._commonfuncs import FlexNbhdEstimator
+from sklearn.utils.parallel import Parallel, delayed
+from joblib import effective_n_jobs
 
 
 class CDim(FlexNbhdEstimator):
@@ -20,14 +22,27 @@ class CDim(FlexNbhdEstimator):
         radial_dists,
         radius=1.0,
         n_neighbors=5,
+        n_jobs=None,
     ):
 
         if nbhd_type not in ["eps", "knn"]:
             raise ValueError("Neighbourhood type should either be knn or eps.")
 
-        self.dimension_pw_ = np.array(
-            [self._local_cdim(X, idx, nbhd) for idx, nbhd in enumerate(nbhd_indices)]
-        )
+        if effective_n_jobs(n_jobs) > 1:
+            with Parallel(n_jobs=n_jobs) as parallel:
+                # Asynchronously apply the `fit` function to each data point and collect the results
+                results = parallel(
+                    delayed(self._local_cdim)(X, idx, nbhd)
+                    for idx, nbhd in enumerate(nbhd_indices)
+                )
+            self.dimension_pw_ = np.array(results)
+        else:
+            self.dimension_pw_ = np.array(
+                [
+                    self._local_cdim(X, idx, nbhd)
+                    for idx, nbhd in enumerate(nbhd_indices)
+                ]
+            )
 
     @staticmethod
     def _local_cdim(X, idx, nbhd):
