@@ -32,7 +32,8 @@
 import numpy as np
 from sklearn.decomposition import PCA
 from sklearn.utils.validation import check_array
-from .._commonfuncs import GlobalEstimator
+from sklearn.utils.parallel import Parallel, delayed
+from joblib import effective_n_jobs
 from .._commonfuncs import FlexNbhdEstimator
 
 
@@ -105,6 +106,7 @@ class lPCA(FlexNbhdEstimator):
         radial_dists,
         radius=1.0,
         n_neighbors=5,
+        n_jobs=None,
     ):
 
         if nbhd_type not in ["eps", "knn"]:
@@ -115,9 +117,18 @@ class lPCA(FlexNbhdEstimator):
         else:
             X = check_array(X, ensure_min_samples=2, ensure_min_features=2)
 
-        self.dimension_pw_ = np.array(
-            [self._pcaLocalDimEst(np.take(X, nbhd, 0))[0] for nbhd in nbhd_indices]
-        )
+        if effective_n_jobs(n_jobs) > 1:
+            with Parallel(n_jobs=n_jobs) as parallel:
+                # Asynchronously apply the `fit` function to each data point and collect the results
+                results = parallel(
+                    delayed(self._pcaLocalDimEst)(np.take(X, nbhd, 0))
+                    for nbhd in nbhd_indices
+                )
+            self.dimension_pw_ = np.array(result[0] for result in results)
+        else:
+            self.dimension_pw_ = np.array(
+                [self._pcaLocalDimEst(np.take(X, nbhd, 0))[0] for nbhd in nbhd_indices]
+            )
 
     def _pcaLocalDimEst(self, X):
         N = X.shape[0]
