@@ -47,3 +47,4 @@ class WODBalls(GlobalEstimator):
         return all_indices_per_row, ratios
     
     
+    
