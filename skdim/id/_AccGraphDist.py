@@ -25,6 +25,22 @@ class AccGraphDist(GlobalEstimator):
         self.model_density_function = model_density_function
         self.metric = metric
         self.density_estimator = density_estimator
+    
+    class HistogramDensityEstimator:
+        """
+        Density estimator based on histogram.
+        The estimator fits histogram to the data and calculates density at given points.
+        """
+        def __init__(self, bins=10, range=None, weights=None):
+            self.bins = bins
+            self.range = range
+            self.weights = weights
+
+        def fit(self, X):
+            self.density, self.bins = np.histogram(X, bins=self.bins, density=True, range=self.range, weights=self.weights)
+        
+        def score_samples(self, X):
+            return np.interp(X, self.bins[:-1], self.density)
 
     def fit(self, X, y=None, n_jobs=1):
         """
@@ -42,12 +58,41 @@ class AccGraphDist(GlobalEstimator):
             The number of jobs to run in parallel for both `fit` and `predict`.
             If -1, then the number of jobs is set to the number of CPU cores.
         """
+        # Estimate geodesic distances using graph distances
         geodesic_distances = AccGraphDist._estimate_geodesic_distances(X, self.n_neighbors)
-        r_max = AccGraphDist._find_r_max(geodesic_distances) # Find maximum of pairwise distribution desnsity function
-        std_distances = 2
-        x_data, density_val = AccGraphDist._prepare_data_to_fit(geodesic_distances, r_max, std_distances)
+        # Fit density estimator to the geodesic distances
+        self.density_estimator.fit(geodesic_distances)
+        # Calculate basic statistics of the geodesic distances
+        max_distance = np.max(geodesic_distances)
+        std_distances = np.std(geodesic_distances)
+        # Find at which distance the density function reaches its maximum
+        r_max = AccGraphDist._find_r_max(density_estimator, min_distance, max_distance)# Find maximum of pairwise distribution desnsity function
+        # Sample uniformly interval [r_max - 2s, r_max] and calculate density at samples
+        x_data, density_val = self._prepare_data_to_fit(r_max, std_distances)
+        # Fit estimated density function to model density function depending on ID
         popt, _ = curve_fit(AccGraphDist._density_function, x_data, density_val)
         self.dimension_ = popt[0]
+    
+    def _prepare_data_to_fit(self, r_max, std_distances):
+        """
+        Prepare data to fit the density function.
+
+        Parameters
+        ----------
+        r_max : float
+            Maximum of pairwise distribution density function.
+
+        std_distances : float
+            Standard deviation of pairwise geodesic distances.
+
+        Returns
+        -------
+        array-like, shape (n_samples, n_samples)
+            Pairwise geodesic distances between points in the dataset.
+        """
+        x_data = np.linspace(0, r_max, 100) / r_max
+        density_val = self.density_estimator.score_samples(x_data)
+        return x_data, density_val
     
     def _estimate_geodesic_distances(self, X):
         """"
