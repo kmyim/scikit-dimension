@@ -33,6 +33,7 @@ import numpy as np
 import pandas as pd
 from sklearn.utils.validation import check_random_state
 from scipy.special import gammainc
+from scipy.integrate import solve_ivp
 import matplotlib.pyplot as plt
 
 
@@ -332,8 +333,45 @@ def torus(n_points, r1=1.0, r2=0.25, random_state=None):
     return data
 
 
-def lorentz_attractor():
-    raise NotImplementedError
+def lorenz_attractor(n_points=10000, tmax=100.0):
+    """Generates a sample from the Lorenz attractor.
+
+    This method incorporates code by Christian Hill, January 2016 and January 2021
+    https://github.com/scipython/scipython-maths/blob/master/lorenz/lorenz.py
+
+    Parameters
+    ----------
+    n_points: int
+        Number of data points to sample.
+    tmax: float, default=100.0
+        Time to run dynamical system
+
+    Returns
+    -------
+    data: np.array, (npoints x ndim)
+        Generated data
+    """
+    sigma, beta, rho = 10, 2.667, 28
+    u0, v0, w0 = 0, 1, 1.05
+
+    def lorenz(t, X, sigma, beta, rho):
+        """The Lorenz equations."""
+        u, v, w = X
+        up = -sigma * (u - v)
+        vp = rho * u - v - u * w
+        wp = -beta * w + u * v
+        return up, vp, wp
+
+    t_eval = np.linspace(0, tmax, n_points)
+    soln = solve_ivp(
+        lorenz,
+        (0, tmax),
+        (u0, v0, w0),
+        t_eval=t_eval,
+        args=(sigma, beta, rho),
+        dense_output=True,
+    )
+    return np.transpose(soln.y)
 
 
 def product(n, sample_1, sample_1_kwargs, sample_2, sample_2_kwargs):
