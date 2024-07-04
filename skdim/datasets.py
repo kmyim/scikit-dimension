@@ -262,10 +262,54 @@ def swissRoll3Sph(n_swiss, n_sphere, a=1, b=2, nturn=1.5, h=4, random_state=None
     return np.hstack((x[:, None], y[:, None], z[:, None], w[:, None]))
 
 
-def peano_curve(n, d=2, depth=2, random_state=None):
+def hilbert_curve(n_points, depth=2, random_state=None):
     random_state = check_random_state(random_state)
-    # TODO
-    pass
+
+    def generate_vertices(m, existing_points, s, x, y, z, dx, dy, dz, dx2, dy2, dz2, dx3, dy3, dz3):
+        if (s == 1):
+            new_points = np.append(existing_points, [[x, y, z]], axis=0)
+            m += 1
+        else:
+            s /= 2
+            x = x - s * dx if dx < 0 else x
+            y = y - s * dy if dy < 0 else y
+            z = z - s * dz if dz < 0 else z
+            x = x - s * dx2 if dx2 < 0 else x
+            y = y - s * dy2 if dy2 < 0 else y
+            z = z - s * dz2 if dz2 < 0 else z
+            x = x - s * dx3 if dx3 < 0 else x
+            y = y - s * dy3 if dy3 < 0 else y
+            z = z - s * dz3 if dz3 < 0 else z
+            m, new_points = generate_vertices(m, existing_points, s, x, y, z, dx2, dy2, dz2, dx3, dy3, dz3, dx, dy, dz)
+            m, new_points = generate_vertices(m, new_points, s, x + s * dx, y + s * dy, z + s * dz, dx3, dy3, dz3, dx,
+                                          dy, dz, dx2, dy2, dz2)
+            m, new_points = generate_vertices(m, new_points, s, x + s * dx + s * dx2, y + s * dy + s * dy2,
+                                          z + s * dz + s * dz2, dx3, dy3, dz3, dx, dy, dz, dx2, dy2, dz2)
+            m, new_points = generate_vertices(m, new_points, s, x + s * dx2, y + s * dy2, z + s * dz2, -dx, -dy, -dz,
+                                          -dx2, -dy2, -dz2, dx3, dy3, dz3)
+            m, new_points = generate_vertices(m, new_points, s, x + s * dx2 + s * dx3, y + s * dy2 + s * dy3,
+                                          z + s * dz2 + s * dz3, -dx, -dy, -dz, -dx2, -dy2, -dz2, dx3, dy3, dz3)
+            m, new_points = generate_vertices(m, new_points, s, x + s * dx + s * dx2 + s * dx3,
+                                          y + s * dy + s * dy2 + s * dy3, z + s * dz + s * dz2 + s * dz3, -dx3, -dy3,
+                                          -dz3, dx, dy, dz, -dx2, -dy2, -dz2)
+            m, new_points = generate_vertices(m, new_points, s, x + s * dx + s * dx3, y + s * dy + s * dy3,
+                                          z + s * dz + s * dz3, -dx3, -dy3, -dz3, dx, dy, dz, -dx2, -dy2, -dz2)
+            m, new_points = generate_vertices(m, new_points, s, x + s * dx3, y + s * dy3, z + s * dz3, dx2, dy2, dz2,
+                                          -dx3, -dy3, -dz3, -dx, -dy, -dz)
+        return m, new_points
+
+    def point_from_parameter(parameter, ordered_points):
+        parameter = parameter * (ordered_points.shape[0] - 1)
+        fractional, floor = np.modf(parameter, casting='unsafe')
+        start, end = ordered_points[int(floor), :], ordered_points[int(floor)+1, :]
+        point = start + (end-start)*(fractional)
+        return point
+
+    m, vertices = generate_vertices(0, np.ndarray(shape=(0,3)), np.power(2, depth), 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1);
+    parameters = random_state.rand(n_points, 1)
+    data = np.apply_along_axis(point_from_parameter, 1, parameters, vertices)
+
+    return data
 
 
 def toroidal_spiral(n, n_twists=20, r1=1.0, r2=0.25, random_state=None):
