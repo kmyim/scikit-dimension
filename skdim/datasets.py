@@ -276,20 +276,28 @@ def toroidal_spiral(n, n_twists=20, r1=1.0, r2=0.25, random_state=None):
     return u + v
 
 def torus(n, r1=1.0, r2=0.25, random_state=None):
+    """Uniform sample from torus."""
     if not r1 > r2:
         raise ValueError("The radii must satisfy r1 > r2.")
     random_state = check_random_state(random_state)
-    phi_sample = hyperBall(n=n, d=1, radius=2 * np.pi, random_state=random_state)
-    u = np.hstack((r1 * np.cos(phi_sample), r1 * np.sin(phi_sample), np.zeros([n, 1])))
-    theta_sample = hyperBall(n=n, d=1, radius=2 * np.pi, random_state=random_state)
-    #NOT UNIFORM
-    v = np.hstack((r2 * np.cos(phi_sample) * np.cos(theta_sample), r2 * np.sin(phi_sample) * np.cos(theta_sample), r2 * np.sin(theta_sample)))
-    sampled_points = u + v
-    area_element = r1 + r2 * np.cos(theta_sample)
-    #FILTER SAMPLED POINTS WITH REJECTION SAMPLING
-    test_numbers = random_state.rand(n, 1) * (r1 + r2)
-    retained_points = sampled_points[np.where(area_element > test_numbers)]
-    return retained_points
+
+    results = np.ndarray((0,3))
+    while results.shape[0] < n:
+        num_to_sample = n - results.shape[0]
+
+        phi_sample = hyperBall(n=num_to_sample, d=1, radius=2 * np.pi, random_state=random_state)
+        theta_sample = hyperBall(n=num_to_sample, d=1, radius=2 * np.pi, random_state=random_state)
+
+        u = np.hstack((r1 * np.cos(phi_sample), r1 * np.sin(phi_sample), np.zeros([num_to_sample, 1])))
+        v = np.hstack((r2 * np.cos(phi_sample) * np.cos(theta_sample), r2 * np.sin(phi_sample) * np.cos(theta_sample), r2 * np.sin(theta_sample)))
+        sampled_points = u + v
+
+        area_element = r1 + r2 * np.cos(theta_sample).reshape((num_to_sample,))
+        test_numbers = random_state.rand(num_to_sample) * (r1 + r2)
+        retained_points = sampled_points[(area_element > test_numbers),:]
+
+        results = np.append(results, retained_points, axis=0)
+    return results
 
 
 def lorentz_attractor():
