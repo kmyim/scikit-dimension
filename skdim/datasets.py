@@ -35,13 +35,14 @@ from sklearn.utils.validation import check_random_state
 from scipy.special import gammainc
 import matplotlib.pyplot as plt
 
+
 def hyperBall(n, d, radius=1.0, center=[], random_state=None):
     """
     Generates a sample from a uniform distribution on the hyperball
 
     Parameters
     ----------
-    n: int 
+    n: int
         Number of data points.
     d: int
         Dimension of the hyperball
@@ -63,7 +64,7 @@ def hyperBall(n, d, radius=1.0, center=[], random_state=None):
     vec *= radius / np.linalg.norm(vec, axis=1)[:, None]
 
     radial = random_state.rand(n, 1)
-    vec *= radial**(1/d)
+    vec *= radial ** (1 / d)
 
     if center == []:
         center = np.array([0] * d)
@@ -78,7 +79,7 @@ def hyperSphere(n, d, radius=1.0, center=[], random_state=None):
 
     Parameters
     ----------
-    n: int 
+    n: int
         Number of data points.
     d: int
         Dimension of the hypersphere
@@ -96,20 +97,20 @@ def hyperSphere(n, d, radius=1.0, center=[], random_state=None):
     """
     random_state = check_random_state(random_state)
     if center == []:
-        center = np.array([0] * (d+1))
-    vec = random_state.randn(n, d+1)
+        center = np.array([0] * (d + 1))
+    vec = random_state.randn(n, d + 1)
     vec /= np.linalg.norm(vec, axis=1)[:, None]
     vec = center + radius * vec
     return vec
 
 
 def hyperTwinPeaks(n, d=2, height=1.0, random_state=None):
-    """ 
+    """
     Generates a sample from a plane with protruding peaks. Translated from Kerstin Johnsson's R package intrinsicDimension
 
     Parameters
     ----------
-    n: int 
+    n: int
         Number of data points.
     d: int
         Dimension of the dataset
@@ -124,7 +125,7 @@ def hyperTwinPeaks(n, d=2, height=1.0, random_state=None):
         Generated data
     """
 
-    #TODO Need a uniform version of this one
+    # TODO Need a uniform version of this one
     random_state = check_random_state(random_state)
     base_coord = random_state.uniform(size=(n, d))
     _height = height * np.prod(np.sin(2 * np.pi * base_coord), axis=1, keepdims=1)
@@ -132,13 +133,13 @@ def hyperTwinPeaks(n, d=2, height=1.0, random_state=None):
 
 
 def lineDiskBall(n, random_state=None):
-    """ 
+    """
     Generates a sample from a uniform distribution on a line, an oblong disk and an oblong ball
     Translated from ldbl function in Hideitsu Hino's package
 
     Parameters
     ----------
-    n: int 
+    n: int
         Number of data points.
     random_state: int, np.random.RandomState instance
         Random number generator
@@ -162,17 +163,20 @@ def lineDiskBall(n, random_state=None):
         )
     )
     disc = np.hstack(
-        (random_state.uniform(-1, 1, (13 * n, 2)), np.zeros(13 * n)[:, None],)
+        (
+            random_state.uniform(-1, 1, (13 * n, 2)),
+            np.zeros(13 * n)[:, None],
+        )
     )
-    disc = disc[~(np.sqrt(np.sum(disc ** 2, axis=1)) > 1), :]
+    disc = disc[~(np.sqrt(np.sum(disc**2, axis=1)) > 1), :]
     disc = disc[:, [0, 2, 1]]
     disc[:, 2] = disc[:, 2] - min(disc[:, 2]) + max(line[:, 2])
 
     fb = random_state.uniform(-0.5, 0.5, size=(n * 100, 3))
-    rmID = np.where(np.sqrt(np.sum(fb ** 2, axis=1)) > 0.5)[0]
+    rmID = np.where(np.sqrt(np.sum(fb**2, axis=1)) > 0.5)[0]
 
     if len(rmID) > 0:
-        fb = fb[~(np.sqrt(np.sum(fb ** 2, axis=1)) > 0.5), :]
+        fb = fb[~(np.sqrt(np.sum(fb**2, axis=1)) > 0.5), :]
 
     fb = np.hstack((fb[:, :2], fb[:, [2]] + 0.5))
     fb[:, 2] = fb[:, 2] - min(fb[:, 2]) + max(disc[:, 2])
@@ -201,13 +205,13 @@ def lineDiskBall(n, random_state=None):
 
 def swissRoll3Sph(n_swiss, n_sphere, a=1, b=2, nturn=1.5, h=4, random_state=None):
     """
-    Generates a sample from a uniform distribution on a Swiss roll-surface, 
+    Generates a sample from a uniform distribution on a Swiss roll-surface,
     possibly together with a sample from a uniform distribution on a 3-sphere
     inside the Swiss roll. Translated from Kerstin Johnsson's R package intrinsicDimension
 
     Parameters
     ----------
-    n_swiss: int 
+    n_swiss: int
         Number of data points on the Swiss roll.
     n_sphere: int
         Number of data points on the 3-sphere.
@@ -216,7 +220,7 @@ def swissRoll3Sph(n_swiss, n_sphere, a=1, b=2, nturn=1.5, h=4, random_state=None
     b: int or float, default=2
         Maximal radius of Swiss roll.
     nturn: int or float, default=1.5
-        Number of turns of the surface. 
+        Number of turns of the surface.
     h: int or float, default=4
         Height of Swiss roll.
 
@@ -231,7 +235,7 @@ def swissRoll3Sph(n_swiss, n_sphere, a=1, b=2, nturn=1.5, h=4, random_state=None
         omega = 2 * np.pi * nturn
 
         def dl(r):
-            return np.sqrt(b ** 2 + omega ** 2 * (a + b * r) ** 2)
+            return np.sqrt(b**2 + omega**2 * (a + b * r) ** 2)
 
         ok = np.zeros(1)
         while sum(ok) < n_swiss:
@@ -259,7 +263,7 @@ def swissRoll3Sph(n_swiss, n_sphere, a=1, b=2, nturn=1.5, h=4, random_state=None
 
 def peano_curve(n, d=2, depth=2, random_state=None):
     random_state = check_random_state(random_state)
-    #TODO
+    # TODO
     pass
 
 
@@ -275,34 +279,61 @@ def toroidal_spiral(n, n_twists=20, r1=1.0, r2=0.25, random_state=None):
     )
     return u + v
 
-def torus(n, r1=1.0, r2=0.25, random_state=None):
-    """Uniform sample from torus."""
+
+def torus(n_points, r1=1.0, r2=0.25, random_state=None):
+    """Generates a uniform sample from the 2d torus.
+
+    Parameters
+    ----------
+    n_points: int
+        Number of data points to sample.
+    r1: float, default=1.0
+        Radius of central circle
+    r2: float, default=0.25
+        Radius of torus, must satisfy r2 < r1.
+
+    Returns
+    -------
+    data: np.array, (npoints x ndim)
+        Generated data
+    """
     if not r1 > r2:
         raise ValueError("The radii must satisfy r1 > r2.")
     random_state = check_random_state(random_state)
 
-    results = np.ndarray((0,3))
-    while results.shape[0] < n:
-        num_to_sample = n - results.shape[0]
+    data = np.ndarray((0, 3))
+    while data.shape[0] < n_points:
+        num_to_sample = n_points - data.shape[0]
 
-        phi_sample = hyperBall(n=num_to_sample, d=1, radius=2 * np.pi, random_state=random_state)
-        theta_sample = hyperBall(n=num_to_sample, d=1, radius=2 * np.pi, random_state=random_state)
+        phi_sample = random_state.rand(num_to_sample) * 2 * np.pi
+        theta_sample = random_state.rand(num_to_sample) * 2 * np.pi
 
-        u = np.hstack((r1 * np.cos(phi_sample), r1 * np.sin(phi_sample), np.zeros([num_to_sample, 1])))
-        v = np.hstack((r2 * np.cos(phi_sample) * np.cos(theta_sample), r2 * np.sin(phi_sample) * np.cos(theta_sample), r2 * np.sin(theta_sample)))
+        u = np.hstack(
+            (
+                r1 * np.cos(phi_sample),
+                r1 * np.sin(phi_sample),
+                np.zeros([num_to_sample, 1]),
+            )
+        )
+        v = np.hstack(
+            (
+                r2 * np.cos(phi_sample) * np.cos(theta_sample),
+                r2 * np.sin(phi_sample) * np.cos(theta_sample),
+                r2 * np.sin(theta_sample),
+            )
+        )
         sampled_points = u + v
 
         area_element = r1 + r2 * np.cos(theta_sample).reshape((num_to_sample,))
         test_numbers = random_state.rand(num_to_sample) * (r1 + r2)
-        retained_points = sampled_points[(area_element > test_numbers),:]
+        retained_points = sampled_points[(area_element > test_numbers), :]
 
-        results = np.append(results, retained_points, axis=0)
-    return results
+        data = np.append(data, retained_points, axis=0)
+    return data
 
 
 def lorentz_attractor():
     raise NotImplementedError
-
 
 
 def product(n, sample_1, sample_1_kwargs, sample_2, sample_2_kwargs):
@@ -320,12 +351,13 @@ def product(n, sample_1, sample_1_kwargs, sample_2, sample_2_kwargs):
     sample_2_kwargs dict
         dictionary of arguments to pass to sample_2
     """
-    sample_1_kwargs.update({'n': n})
-    sample_2_kwargs.update({'n': n})
+    sample_1_kwargs.update({"n": n})
+    sample_2_kwargs.update({"n": n})
     sample_1_points = sample_1(**sample_1_kwargs)
     sample_2_points = sample_2(**sample_2_kwargs)
 
     return np.hstack((sample_1_points, sample_2_points))
+
 
 def dumbbell(n, connecting_radius=0.1, ramdom_state=None):
     """Create a sample from a PL model of a 2-dimensional dumbell in R^3e.
@@ -338,27 +370,30 @@ def dumbbell(n, connecting_radius=0.1, ramdom_state=None):
     random_state: int, np.random.RandomState instance
         Random number generator
     """
+
     def profile_function(x):
-        """ Defines a dumbbell shape on [-1.0, 1.0] with radius 0.5 at the ends and connecting_radius at the connecting bar."""
+        """Defines a dumbbell shape on [-1.0, 1.0] with radius 0.5 at the ends and connecting_radius at the connecting bar."""
         outer_x = 0.4
         inner_x = 0.4
         outer_slope = 0.5 / outer_x
         inner_slope = (0.5 - connecting_radius) / inner_x
 
-        out_of_bounds_message=f"The dumbbell is only defined between -1.0 and 1.0 but {x} was passed."
+        out_of_bounds_message = (
+            f"The dumbbell is only defined between -1.0 and 1.0 but {x} was passed."
+        )
 
-        if x<-1.0:
+        if x < -1.0:
             raise ValueError(out_of_bounds_message)
-        elif x<-1.0 + outer_x:
+        elif x < -1.0 + outer_x:
             return outer_slope * (x + 1.0)
-        elif x<-1.0 + outer_x + inner_x:
+        elif x < -1.0 + outer_x + inner_x:
             return 0.5 - inner_slope * (x + 1.0 - outer_x)
-        elif x<1.0 - outer_x - inner_x:
+        elif x < 1.0 - outer_x - inner_x:
             return connecting_radius
-        elif x<1.0 - outer_x:
+        elif x < 1.0 - outer_x:
             return connecting_radius + inner_slope * (x - 1.0 + outer_x + inner_x)
-        elif x<=1.0:
-            return 0.5  - outer_slope * (x - 1.0 + outer_x)
+        elif x <= 1.0:
+            return 0.5 - outer_slope * (x - 1.0 + outer_x)
         else:
             raise ValueError(out_of_bounds_message)
 
@@ -624,7 +659,12 @@ class BenchmarkManifolds:
         p = 2.0 * self.random_state.rand(n)
 
         data = np.vstack(
-            [np.sin(t), p, np.sign(t) * (np.cos(t) - 1), np.zeros((dim - d - 1, n)),]
+            [
+                np.sin(t),
+                p,
+                np.sign(t) * (np.cos(t) - 1),
+                np.zeros((dim - d - 1, n)),
+            ]
         ).T
         assert data.shape == (n, dim)
         return data
@@ -634,7 +674,10 @@ class BenchmarkManifolds:
 
         V = self.random_state.randn(n, d + 1)
         data = np.hstack(
-            [V / np.sqrt((V ** 2).sum(axis=1))[:, None], np.zeros((n, dim - d - 1)),]
+            [
+                V / np.sqrt((V**2).sum(axis=1))[:, None],
+                np.zeros((n, dim - d - 1)),
+            ]
         )
         assert data.shape == (n, dim)
         return data
@@ -728,12 +771,12 @@ class BenchmarkManifolds:
         p0, p1, p2, p3 = self.random_state.rand(d, n)
         data = np.vstack(
             [
-                p1 ** 2 * np.cos(2 * np.pi * p0),
-                p2 ** 2 * np.sin(2 * np.pi * p0),
+                p1**2 * np.cos(2 * np.pi * p0),
+                p2**2 * np.sin(2 * np.pi * p0),
                 p1 + p2 + (p1 - p3) ** 2,
                 p1 - 2 * p2 + (p0 - p3) ** 2,
                 -p1 - 2 * p2 + (p2 - p3) ** 2,
-                p0 ** 2 - p1 ** 2 + p2 ** 2 - p3 ** 2,
+                p0**2 - p1**2 + p2**2 - p3**2,
             ]
         ).T
 
@@ -763,8 +806,8 @@ class BenchmarkManifolds:
 
         E = self.random_state.exponential(1, (d + 1, n))
         X = ((1 + E[1:] / E[0]) ** -1).T
-        X = np.hstack([X, (X ** 2).sum(axis=1)[:, np.newaxis]])
-        data = np.hstack([X, np.sin(X), X ** 2])
+        X = np.hstack([X, (X**2).sum(axis=1)[:, np.newaxis]])
+        data = np.hstack([X, np.sin(X), X**2])
 
         assert data.shape == (n, dim)
         return data
@@ -804,8 +847,10 @@ class BenchmarkManifolds:
         data = np.concatenate([temp1, temp2, temp1, temp2], axis=1)
         return data
 
+
 class SurfaceOfRevolution:
     """Implementation of surfaces of revolution."""
+
     def __init__(self, func, how="x", xmin=-1.0, xmax=1.0, random_state=None):
         """
         Create a surface of revolution which is symmetric around the x-axix.
