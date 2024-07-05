@@ -45,11 +45,11 @@ def monomial_embedding(data, degree=5):
 
 
 def nonlinear():
-    pass
+    raise NotImplementedError
 
 
 def linear():
-    pass
+    raise NotImplementedError
 
 
 def radial_basis_function(data, n_functions=None):
@@ -57,18 +57,18 @@ def radial_basis_function(data, n_functions=None):
     if not n_functions:
         n_functions = input_dimension
     landmarks = data[np.random.choice(data.shape[0], n_functions, replace=False), :]
-    #TODO Define function using distances from landmarks
+    # TODO Define function using distances from landmarks
 
     raise NotImplementedError
 
 
 def kernel_trick():
-    pass
+    raise NotImplementedError
 
 
 def dictionary_learning():
-    pass
+    raise NotImplementedError
 
 
 def tangent_function():
-    pass
+    raise NotImplementedError
