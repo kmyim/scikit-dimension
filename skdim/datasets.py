@@ -37,6 +37,29 @@ from scipy.integrate import solve_ivp
 import matplotlib.pyplot as plt
 
 
+def product(n, sample_1, sample_1_kwargs, sample_2, sample_2_kwargs):
+    """Create a sample from a product using two methods in this module.
+
+    Parameters
+    n   int
+        number of points to sample
+    sample_1    method
+        function to create first sample
+    sample_1_kwargs dict
+        dictionary of arguments to pass to sample_1
+    sample_2    method
+        function to create first sample
+    sample_2_kwargs dict
+        dictionary of arguments to pass to sample_2
+    """
+    sample_1_kwargs.update({"n": n})
+    sample_2_kwargs.update({"n": n})
+    sample_1_points = sample_1(**sample_1_kwargs)
+    sample_2_points = sample_2(**sample_2_kwargs)
+
+    return np.hstack((sample_1_points, sample_2_points))
+
+
 def hyperBall(n, d, radius=1.0, center=[], random_state=None):
     """
     Generates a sample from a uniform distribution on the hyperball
@@ -126,11 +149,68 @@ def hyperTwinPeaks(n, d=2, height=1.0, random_state=None):
         Generated data
     """
 
-    # TODO Need a uniform version of this one
     random_state = check_random_state(random_state)
     base_coord = random_state.uniform(size=(n, d))
-    _height = height * np.prod(np.sin(2 * np.pi * base_coord), axis=1, keepdims=1)
+    _height = height * np.prod(np.sin(2 * np.pi * base_coord), axis=1, keepdims=True)
     return np.hstack((base_coord, _height))
+
+
+def hyperTwinPeaksUniform(n, d=2, height=1.0, random_state=None):
+    """
+    Generates a uniform sample from a plane with protruding peaks.
+
+    Translated from Kerstin Johnsson's R package intrinsicDimension, with amendments to ensure sample is uniform with respect to the Hausdorff measure.
+
+    Parameters
+    ----------
+    n: int
+        Number of data points.
+    d: int
+        Dimension of the dataset
+    height: float
+        Height of the peaks
+    random_state: int, np.random.RandomState instance
+        Random number generator
+
+    Returns
+    -------
+    data: np.array, (npoints x ndim)
+        Generated data
+    """
+    random_state = check_random_state(random_state)
+    data = np.ndarray((0, d + 1))
+    while data.shape[0] < n:
+        num_to_sample = n - data.shape[0]
+        base_coord = random_state.uniform(size=(num_to_sample, d))
+        _height = height * np.prod(
+            np.sin(2 * np.pi * base_coord), axis=1, keepdims=True
+        )
+        sampled_points = np.hstack((base_coord, _height))
+        metric_matrix = np.ndarray(shape=(num_to_sample, d, d))
+        for i in range(num_to_sample):
+            for j in range(d):
+                for k in range(d):
+                    metric_matrix[i, j, k] = (
+                        height
+                        * np.prod(np.sin(2 * np.pi * np.delete(base_coord[i, :], [j])))
+                        * np.prod(np.sin(2 * np.pi * np.delete(base_coord[i, :], [k])))
+                        * np.cos(2 * np.pi * base_coord[i, j])
+                        * np.cos(2 * np.pi * base_coord[i, k])
+                        * 4
+                        * np.power(np.pi, 2)
+                        + np.eye(d)[j, k]
+                    )
+        volume_elements = np.zeros(num_to_sample)
+        for _ in range(volume_elements.shape[0]):
+            volume_elements[_] = np.linalg.det(metric_matrix[_])
+        volume_elements = np.power(volume_elements, 0.5)
+        test_numbers = (
+            random_state.rand(num_to_sample) * height * 4 * np.power(np.pi, 2)
+        ) + 1
+        retained_points = sampled_points[(volume_elements > test_numbers), :]
+        data = np.append(data, retained_points, axis=0)
+
+    return data
 
 
 def lineDiskBall(n, random_state=None):
@@ -366,29 +446,6 @@ def lorenz_attractor(n_points=10000, tmax=100.0):
         dense_output=True,
     )
     return np.transpose(soln.y)
-
-
-def product(n, sample_1, sample_1_kwargs, sample_2, sample_2_kwargs):
-    """Create a sample from a product using two methods in this module.
-
-    Parameters
-    n   int
-        number of points to sample
-    sample_1    method
-        function to create first sample
-    sample_1_kwargs dict
-        dictionary of arguments to pass to sample_1
-    sample_2    method
-        function to create first sample
-    sample_2_kwargs dict
-        dictionary of arguments to pass to sample_2
-    """
-    sample_1_kwargs.update({"n": n})
-    sample_2_kwargs.update({"n": n})
-    sample_1_points = sample_1(**sample_1_kwargs)
-    sample_2_points = sample_2(**sample_2_kwargs)
-
-    return np.hstack((sample_1_points, sample_2_points))
 
 
 def dumbbell(n, connecting_radius=0.1, ramdom_state=None):
