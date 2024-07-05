@@ -262,56 +262,6 @@ def swissRoll3Sph(n_swiss, n_sphere, a=1, b=2, nturn=1.5, h=4, random_state=None
     return np.hstack((x[:, None], y[:, None], z[:, None], w[:, None]))
 
 
-def hilbert_curve(n_points, depth=2, random_state=None):
-    random_state = check_random_state(random_state)
-
-    def generate_vertices(m, existing_points, s, x, y, z, dx, dy, dz, dx2, dy2, dz2, dx3, dy3, dz3):
-        if (s == 1):
-            new_points = np.append(existing_points, [[x, y, z]], axis=0)
-            m += 1
-        else:
-            s /= 2
-            x = x - s * dx if dx < 0 else x
-            y = y - s * dy if dy < 0 else y
-            z = z - s * dz if dz < 0 else z
-            x = x - s * dx2 if dx2 < 0 else x
-            y = y - s * dy2 if dy2 < 0 else y
-            z = z - s * dz2 if dz2 < 0 else z
-            x = x - s * dx3 if dx3 < 0 else x
-            y = y - s * dy3 if dy3 < 0 else y
-            z = z - s * dz3 if dz3 < 0 else z
-            m, new_points = generate_vertices(m, existing_points, s, x, y, z, dx2, dy2, dz2, dx3, dy3, dz3, dx, dy, dz)
-            m, new_points = generate_vertices(m, new_points, s, x + s * dx, y + s * dy, z + s * dz, dx3, dy3, dz3, dx,
-                                          dy, dz, dx2, dy2, dz2)
-            m, new_points = generate_vertices(m, new_points, s, x + s * dx + s * dx2, y + s * dy + s * dy2,
-                                          z + s * dz + s * dz2, dx3, dy3, dz3, dx, dy, dz, dx2, dy2, dz2)
-            m, new_points = generate_vertices(m, new_points, s, x + s * dx2, y + s * dy2, z + s * dz2, -dx, -dy, -dz,
-                                          -dx2, -dy2, -dz2, dx3, dy3, dz3)
-            m, new_points = generate_vertices(m, new_points, s, x + s * dx2 + s * dx3, y + s * dy2 + s * dy3,
-                                          z + s * dz2 + s * dz3, -dx, -dy, -dz, -dx2, -dy2, -dz2, dx3, dy3, dz3)
-            m, new_points = generate_vertices(m, new_points, s, x + s * dx + s * dx2 + s * dx3,
-                                          y + s * dy + s * dy2 + s * dy3, z + s * dz + s * dz2 + s * dz3, -dx3, -dy3,
-                                          -dz3, dx, dy, dz, -dx2, -dy2, -dz2)
-            m, new_points = generate_vertices(m, new_points, s, x + s * dx + s * dx3, y + s * dy + s * dy3,
-                                          z + s * dz + s * dz3, -dx3, -dy3, -dz3, dx, dy, dz, -dx2, -dy2, -dz2)
-            m, new_points = generate_vertices(m, new_points, s, x + s * dx3, y + s * dy3, z + s * dz3, dx2, dy2, dz2,
-                                          -dx3, -dy3, -dz3, -dx, -dy, -dz)
-        return m, new_points
-
-    def point_from_parameter(parameter, ordered_points):
-        parameter = parameter * (ordered_points.shape[0] - 1)
-        fractional, floor = np.modf(parameter, casting='unsafe')
-        start, end = ordered_points[int(floor), :], ordered_points[int(floor)+1, :]
-        point = start + (end-start)*(fractional)
-        return point
-
-    m, vertices = generate_vertices(0, np.ndarray(shape=(0,3)), np.power(2, depth), 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1);
-    parameters = random_state.rand(n_points, 1)
-    data = np.apply_along_axis(point_from_parameter, 1, parameters, vertices)
-
-    return data
-
-
 def toroidal_spiral(n, n_twists=20, r1=1.0, r2=0.25, random_state=None):
     if not r1 > r2:
         raise ValueError("The radii must satisfy r1 > r2.")
@@ -481,6 +431,93 @@ def dumbbell(n, connecting_radius=0.1, ramdom_state=None):
 
     dumbbell_surface = SurfaceOfRevolution(profile_function, random_state=ramdom_state)
     return dumbbell_surface.sample_points(n_points=n)
+
+
+class HilbertCurve:
+    """Generates a dataset sampled from the Hilbert curve in a cube.
+
+    Based on Kyle Finn's javascript code at https://stackoverflow.com/questions/14519267/
+
+    Methods
+    -------
+    generate(n_points, depth=2)
+        Generates n_points of data from a curve with recursion of the given depth.
+    """
+
+    def __init__(self, random_state=None):
+        """
+        Parameters
+        ----------
+        random_state: int
+        """
+        self.random_state = check_random_state(random_state)
+        self._vertices = np.ndarray(shape=(0, 3))
+
+    @staticmethod
+    def _translate(s, point, d1, d2, d3):
+        """
+        Moves the point to the next sub-cube.
+        """
+        point = point - s * np.where(d1 < 0, d1, 0)
+        point = point - s * np.where(d2 < 0, d2, 0)
+        point = point - s * np.where(d3 < 0, d3, 0)
+        return point
+
+    def _make_curve(
+        self,
+        side,
+        point=np.array([[0, 0, 0]]),
+        d1=np.array([[1, 0, 0]]),
+        d2=np.array([[0, 1, 0]]),
+        d3=np.array([[0, 0, 1]]),
+    ):
+        """
+        Recursively creates a list of vertices until side_length is 1.
+        """
+        if side == 1:
+            self._vertices = np.append(self._vertices, point, axis=0)
+        else:
+            side /= 2
+            point = self._translate(side, point, d1, d2, d3)
+            self._make_curve(side, point, d2, d3, d1)
+            self._make_curve(side, point + side * d1, d3, d1, d2)
+            self._make_curve(side, point + side * (d1 + d2), d3, d1, d2)
+            self._make_curve(side, point + side * d2, -d1, -d2, d3)
+            self._make_curve(side, point + side * (d2 + d3), -d1, -d2, d3)
+            self._make_curve(side, point + side * (d1 + d2 + d3), -d3, d1, -d2)
+            self._make_curve(side, point + side * (d1 + d3), -d3, d1, -d2)
+            self._make_curve(side, point + side * d3, d2, -d3, -d1)
+
+    def _point_from_parameter(self, parameter):
+        """Maps a parameter in the unit interval to a point on the curve"""
+        parameter = parameter * (self._vertices.shape[0] - 1)
+        fractional, floor = np.modf(parameter)
+        start, end = self._vertices[int(floor), :], self._vertices[int(floor) + 1, :]
+        point = start + (end - start) * (fractional)
+        return point
+
+    def generate(self, n_points, depth=2):
+        """Generates points on a Hilbert curve.
+
+        Parameters
+        ----------
+        n_points: int
+            The number of points to generate.
+        depth: int, default=2
+            The number of recursive steps to take in approximating the curve.
+
+        Returns
+        -------
+        data: np.array, (n_points x 3)
+            Generated data.
+        """
+        if not isinstance(depth, int) or depth < 1:
+            raise TypeError("The variable 'depth' must be a positive integer.")
+        side_length = np.power(2, depth)
+        self._make_curve(side_length)
+        parameters = self.random_state.rand(n_points, 1)
+        data = np.apply_along_axis(self._point_from_parameter, 1, parameters)
+        return data
 
 
 class BenchmarkManifolds:
