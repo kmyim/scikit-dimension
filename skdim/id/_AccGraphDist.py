@@ -1,6 +1,7 @@
 from .._commonfuncs import get_nn, GlobalEstimator
 import numpy as np
 from scipy.optimize import curve_fit
+from scipy.special import gamma
 from sklearn.neighbors import kneighbors_graph, radius_neighbors_graph
 from sklearn.utils.graph import graph_shortest_path
 
@@ -13,7 +14,8 @@ class AccGraphDist(GlobalEstimator):
     Scientific Report, 6, 31377 (2016)
     https://www.nature.com/articles/srep31377
     """
-    def __init__(self, n_neighbors=None, eps=None, metric="euclidean", model_density_function=None, density_estimator=None):
+    def __init__(self, n_neighbors=None, eps=None, metric="euclidean", model_density_function=None,
+        density_estimator=None):
         """
         Parameters
         ----------
@@ -24,11 +26,18 @@ class AccGraphDist(GlobalEstimator):
         self.eps = eps
         self.model_density_function = model_density_function
         self.metric = metric
-        self.density_estimator = density_estimator
+        if model_density_function is None:
+            self.model_density_function = AccGraphDist._scaled_hypersphere_geodesic_dist_density
+        else:
+            self.model_density_function = model_density_function
+        if density_estimator is None:
+            self.density_estimator = AccGraphDist.HistogramDensityEstimator(bins=100)
+        else:
+            self.density_estimator = density_estimator
     
     class HistogramDensityEstimator:
         """
-        Density estimator based on histogram.
+        Density estimator based on histogram. (For compatibility with original code)
         The estimator fits histogram to the data and calculates density at given points.
         """
         def __init__(self, bins=10, range=None, weights=None):
@@ -38,6 +47,9 @@ class AccGraphDist(GlobalEstimator):
 
         def fit(self, X):
             self.density, self.bins = np.histogram(X, bins=self.bins, density=True, range=self.range, weights=self.weights)
+        
+        def max(self):
+            return np.max(self.density)
         
         def score_samples(self, X):
             return np.interp(X, self.bins[:-1], self.density)
@@ -66,7 +78,7 @@ class AccGraphDist(GlobalEstimator):
         max_distance = np.max(geodesic_distances)
         std_distances = np.std(geodesic_distances)
         # Find at which distance the density function reaches its maximum
-        r_max = AccGraphDist._find_r_max(density_estimator, min_distance, max_distance)# Find maximum of pairwise distribution desnsity function
+        r_max = self._find_r_max(density_estimator, max_distance)# Find maximum of pairwise distribution density function
         # Sample uniformly interval [r_max - 2s, r_max] and calculate density at samples
         x_data, density_val = self._prepare_data_to_fit(r_max, std_distances)
         # Fit estimated density function to model density function depending on ID
@@ -90,7 +102,7 @@ class AccGraphDist(GlobalEstimator):
         array-like, shape (n_samples, n_samples)
             Pairwise geodesic distances between points in the dataset.
         """
-        x_data = np.linspace(0, r_max, 100) / r_max
+        x_data = np.linspace(r_max - 2 * std_distances, r_max, 100)
         density_val = self.density_estimator.score_samples(x_data)
         return x_data, density_val
     
@@ -119,7 +131,7 @@ class AccGraphDist(GlobalEstimator):
         return geodesic_distances
     
     @staticmethod
-    def _find_r_max(geodedsic_distances):
+    def _find_r_max(self, max_distance):
         """
         Find maximum of pairwise distribution density function.
 
@@ -134,8 +146,15 @@ class AccGraphDist(GlobalEstimator):
             Maximum of pairwise distribution density function.
         """
 
-        r_max = 0
-        return r_max
+        x_grid = np.linspace(0, max_distance, 100)
+        density_val = self.density_estimator.score_samples(x_grid)
+        return x_grid[np.argmax(density_val)]
+    
+
+
+    @staticmethod
+    def _scaled_hypersphere_geodesic_dist_density(r, d, r_max):
+        return AccGraphDist._density_function(np.pi * r / r_max / 2 , d)
     
     @staticmethod
     def _hypersphere_geodesic_dist_density(r, d):
@@ -155,7 +174,7 @@ class AccGraphDist(GlobalEstimator):
         float
             Density of geodesic distances between points on a hypersphere of dimension d.
         """
-        return (np.sin(x))**(d-1)#2 * x * (np.sin(x))**(d-1) / (np.pi**d * np.math.factorial(d-1))
+        return (np.sin(x))**(d-1) * (scipy.special.gamma( (d+1)/2)) / scipy.special.gamma(d / 2) / np.pi
 
 
 
