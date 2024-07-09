@@ -5,7 +5,7 @@ Methods to embed a dataset into a higher dimensional space.
 import numpy as np
 
 
-def generate_monomials(n_variables, degree=5):
+def _generate_monomials(n_variables, degree=5):
     """Create a numpy array with the coefficients of all monomials."""
 
     if degree == 0:
@@ -14,7 +14,7 @@ def generate_monomials(n_variables, degree=5):
     output = []
     initial_monomials = list(np.eye(n_variables, dtype=int))
     for x_var, initial_monomial in enumerate(initial_monomials):
-        next_monomials = generate_monomials(
+        next_monomials = _generate_monomials(
             n_variables=n_variables - x_var, degree=degree - 1
         )
 
@@ -35,7 +35,7 @@ def generate_monomials(n_variables, degree=5):
 def monomial_embedding(data, degree=5):
     """Embed 'data' into higher dimensional space using monomials."""
     input_dimension = np.shape(data)[1]
-    monomials = generate_monomials(input_dimension, degree=degree)
+    monomials = _generate_monomials(input_dimension, degree=degree)
     return np.hstack(
         [
             np.product(np.power(data, monomial), axis=1, keepdims=True)
