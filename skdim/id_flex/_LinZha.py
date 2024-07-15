@@ -76,7 +76,7 @@ class LinZha(FlexNbhdEstimator):
         threshold_jump[0] = -1
         safe_nbhds = []
         for idx, result in enumerate(results):
-            safe_nbhds.append(result[0][result[1] < threshold_jump])
+            safe_nbhds.append(result[0][result[2] < threshold_jump])
 
         nbhd_graph = nx.Graph()
         nbhd_graph.add_nodes_from(range(len(safe_nbhds)))
@@ -94,17 +94,16 @@ class LinZha(FlexNbhdEstimator):
 
         visibility = []
         for i, vector in enumerate(vectors):
-            if i == 0:
-                visibility.append(True)
-                continue
-            for j, other_vector in enumerate(vectors):
-                if j == 0 or j == i:
-                    continue
-                onward_vector = vector - other_vector
-                if np.dot(onward_vector, other_vector) >= 0:
-                    visibility.append(False)
-                    break
-            visibility.append(True)
+            visible = True
+            if i != 0:
+                for j, other_vector in enumerate(vectors):
+                    if j == 0 or j == i:
+                        continue
+                    onward_vector = vector - other_vector
+                    if np.dot(onward_vector, other_vector) >= 0:
+                        visible = False
+                        break
+            visibility.append(visible)
         visibility = np.array(visibility)
 
         visible_nbhd = nbhd[visibility]
@@ -115,11 +114,13 @@ class LinZha(FlexNbhdEstimator):
     @staticmethod
     def _safe_neighbors(X, nbhd, radial_dist):
         neighbors = np.take(X, nbhd, axis=0)
-        incremental_dims = []
+        incremental_dims = [0]
         for i, _ in enumerate(neighbors):
-            data = neighbors[0:i, :]
+            if i==0:
+                continue
+            data = neighbors[0:i+1, :]
             incremental_dims.append(lPCA(ver="FO", alphaFO=0.05).fit_transform(data))
-        jumps = np.zeros(shape=(len(neighbors),))
+        jumps = np.zeros(shape=(len(incremental_dims),))
         for i, dim in enumerate(incremental_dims):
             if i == 0:
                 continue
