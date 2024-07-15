@@ -410,7 +410,7 @@ class FlexNbhdEstimator(BaseEstimator):
             raise TypeError(
                     "Invalid pw_dim parameter. It has to be bool"
                 )
-        elif self.pw_dim: #global estimator
+        elif not self.pw_dim: #global estimator
             if self.comb is not None:
                 raise ValueError(
                     "Estimator does not produce pointwise dimension estimate, no aggregation over pointwise dimension estimates is implemented."
