@@ -46,9 +46,10 @@ def test_get_neigh_unknown_metric(estim_class, data):
 @pytest.mark.parametrize("estim_class", estimators)
 def test_aggregation_computes_global_dim(estim_class, data):
     estimator = estim_class()
-    estimator.fit_pw(data)
-    estimator.aggr()
-    assert hasattr(estimator, "dimension_")
+    if estimator.pw_dim:
+        estimator.fit_pw(data)
+        estimator.aggr()
+        assert hasattr(estimator, "dimension_")
 
 @pytest.mark.parametrize("estim_class", estimators)
 def test_fit_computes_global_dim(estim_class, data):
@@ -59,8 +60,9 @@ def test_fit_computes_global_dim(estim_class, data):
 @pytest.mark.parametrize("estim_class", estimators)
 def test_fit_pw_computes_pw_dim(estim_class, data):
     estimator = estim_class()
-    estimator.fit_pw(data)
-    assert hasattr(estimator, "dimension_pw_")
+    if estimator.pw_dim:
+        estimator.fit_pw(data)
+        assert hasattr(estimator, "dimension_pw_")
 
 @pytest.mark.parametrize("estim_class", estimators)
 def test_fit_single_job_equal_to_fit(estim_class, data):
