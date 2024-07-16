@@ -391,9 +391,9 @@ class FlexNbhdEstimator(BaseEstimator):
         kwargs: keyword arguments, such as 'n_neighbors', or 'radius' for sklearn NearestNeighbor to infer local neighbourhoods
         """
 
-        self.pw_dim = pw_dim 
+        self.pw_dim = pw_dim
         self.nbhd_type = nbhd_type
-        self.pt_nbhd_incl_pt = pt_nbhd_incl_pt 
+        self.pt_nbhd_incl_pt = pt_nbhd_incl_pt
         self.metric = metric
         self.comb = comb
         self.smooth_flag = smooth
@@ -402,8 +402,8 @@ class FlexNbhdEstimator(BaseEstimator):
         self.n_neighbors = n_neighbors
         self.sort_radial = sort_radial
 
-        
-        
+
+
     def attr_checks(self):
 
         if not isinstance(self.pw_dim, bool):
@@ -449,29 +449,29 @@ class FlexNbhdEstimator(BaseEstimator):
                     "Metric not in scikit-learn list of metrics. See sklearn.metrics.pairwise.distance_metrics()"
                 )
 
-        
+
         if not isinstance(self.pt_nbhd_incl_pt, bool):
                 raise TypeError(
                     "Invalid pt_nbhd_incl_pt parameter. It has to be bool"
                 )
-        
-        
+
+
         if not isinstance(self.n_jobs, int):
                 raise TypeError(
                     "Invalid n_jobs parameter. It has to be integer > 0"
                 )
-        
+
         elif self.n_jobs < 1:
             raise ValueError(
                     "Invalid n_jobs parameter. It has to be integer > 0"
                 )
-        
+
 
     @abstractmethod
     def _fit(self, X, nbhd_indices, radial_dists, **kwargs):
         """
         Custom method to each local ID estimator, called in fit
-
+        
         """
         raise NotImplementedError
 
@@ -490,7 +490,7 @@ class FlexNbhdEstimator(BaseEstimator):
         #check arrays here
 
 
-        
+
         self._fit_pw(
             X,
             y=None,
@@ -539,7 +539,7 @@ class FlexNbhdEstimator(BaseEstimator):
                 self._smooth(nbhd_indices)
         else:
             self.is_fitted_ = True
-        
+
         return self
 
 
@@ -548,7 +548,7 @@ class FlexNbhdEstimator(BaseEstimator):
         Parameters:
 
         X: (n_samples, n_features) or (n_samples, n_samples) if metric=’precomputed’
-        
+
         Returns:
 
         nbhd_indices: (n_samples, n_neighbors) numpy array (if knn) or list of neighbourhoods (if eps)
@@ -556,7 +556,7 @@ class FlexNbhdEstimator(BaseEstimator):
 
         """
         self.attr_checks()
-        
+
         neigh = NearestNeighbors(
             metric=self.metric, n_jobs= self.n_jobs, n_neighbors=self.n_neighbors, radius=self.radius
         )
