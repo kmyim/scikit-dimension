@@ -99,12 +99,7 @@ class lPCA(FlexNbhdEstimator):
         self.verbose = verbose
         self.fit_explained_variance = fit_explained_variance
 
-    def _fit(
-        self,
-        X,
-        nbhd_indices,
-        radial_dists
-    ):
+    def _fit(self, X, nbhd_indices, radial_dists):
 
         if self.fit_explained_variance:
             X = check_array(X, ensure_2d=False, ensure_min_samples=2)
