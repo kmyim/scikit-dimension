@@ -87,7 +87,9 @@ class lPCA(FlexNbhdEstimator):
         PFan=0.95,
         verbose=True,
         fit_explained_variance=False,
+        **kwargs
     ):
+        super().__init__(**kwargs)
         self.ver = ver
         self.alphaRatio = alphaRatio
         self.alphaFO = alphaFO
@@ -101,24 +103,16 @@ class lPCA(FlexNbhdEstimator):
         self,
         X,
         nbhd_indices,
-        nbhd_type,
-        metric,
-        radial_dists,
-        radius=1.0,
-        n_neighbors=5,
-        n_jobs=None,
+        radial_dists
     ):
-
-        if nbhd_type not in ["eps", "knn"]:
-            raise ValueError("Neighbourhood type should either be knn or eps.")
 
         if self.fit_explained_variance:
             X = check_array(X, ensure_2d=False, ensure_min_samples=2)
         else:
             X = check_array(X, ensure_min_samples=2, ensure_min_features=2)
 
-        if effective_n_jobs(n_jobs) > 1:
-            with Parallel(n_jobs=n_jobs) as parallel:
+        if effective_n_jobs(self.n_jobs) > 1:
+            with Parallel(n_jobs=self.n_jobs) as parallel:
                 # Asynchronously apply the `fit` function to each data point and collect the results
                 results = parallel(
                     delayed(self._pcaLocalDimEst)(np.take(X, nbhd, 0))
