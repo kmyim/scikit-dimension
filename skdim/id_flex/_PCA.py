@@ -118,7 +118,7 @@ class lPCA(FlexNbhdEstimator):
                     delayed(self._pcaLocalDimEst)(np.take(X, nbhd, 0))
                     for nbhd in nbhd_indices
                 )
-            self.dimension_pw_ = np.array(result[0] for result in results)
+            self.dimension_pw_ = np.array([result[0] for result in results])
         else:
             self.dimension_pw_ = np.array(
                 [self._pcaLocalDimEst(np.take(X, nbhd, 0))[0] for nbhd in nbhd_indices]
