@@ -69,12 +69,6 @@ class lPCA(FlexNbhdEstimator):
     fit_explained_variance: bool, default=False
         If True, lPCA.fit(X) expects as input
         a precomputed explained_variance vector: X = sklearn.decomposition.PCA().fit(X).explained_variance_
-
-    Attributes
-    ----------
-    gap_pw_:
-        Ratio of each PC's explained variance (except the last)
-        with the following PC's explained variance at each point
     """
 
     def __init__(
