@@ -13,23 +13,10 @@ class CDim(FlexNbhdEstimator):
     https://doi.org/10.1137/1.9781611972771.16
     """
 
-    def _fit(
-        self,
-        X,
-        nbhd_indices,
-        nbhd_type,
-        metric,
-        radial_dists,
-        radius=1.0,
-        n_neighbors=5,
-        n_jobs=None,
-    ):
+    def _fit(self, X, nbhd_indices, radial_dists):
 
-        if nbhd_type not in ["eps", "knn"]:
-            raise ValueError("Neighbourhood type should either be knn or eps.")
-
-        if effective_n_jobs(n_jobs) > 1:
-            with Parallel(n_jobs=n_jobs) as parallel:
+        if effective_n_jobs(self.n_jobs) > 1:
+            with Parallel(n_jobs=self.n_jobs) as parallel:
                 # Asynchronously apply the `fit` function to each data point and collect the results
                 results = parallel(
                     delayed(self._local_cdim)(X, idx, nbhd)
