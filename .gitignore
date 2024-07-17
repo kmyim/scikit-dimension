@@ -1,6 +1,9 @@
+skdimvenv/
+skdvenv/
 *.vscode
 *.idea
 *.ini
+skdvenv/
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -72,3 +75,4 @@ target/
 /bin
 pyvenv.cfg
 /share
+

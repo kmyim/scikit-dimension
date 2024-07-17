@@ -388,7 +388,8 @@ class FlexNbhdEstimator(BaseEstimator):
         comb: method of averaging either 'mean', 'median', or 'hmean'
         smooth: if true, average over dimension estimates of local neighbourhoods using comb
         n_jobs: number of parallel processes in inferring local neighbourhood
-        kwargs: keyword arguments, such as 'n_neighbors', or 'radius' for sklearn NearestNeighbor to infer local neighbourhoods
+        radius: radius parameter for nearest neighbour construction
+        n_neighbors: number of neighbors for k nearest neighbourhood construction
         """
 
         self.pw_dim = pw_dim 
@@ -458,12 +459,12 @@ class FlexNbhdEstimator(BaseEstimator):
         
         if not isinstance(self.n_jobs, int):
                 raise TypeError(
-                    "Invalid n_jobs parameter. It has to be integer > 0"
+                    "Invalid n_jobs parameter (passed to sklearn NearestNeighbors). It has to be integer >= -1. "
                 )
         
-        elif self.n_jobs < 1:
+        elif self.n_jobs < -1:
             raise ValueError(
-                    "Invalid n_jobs parameter. It has to be integer > 0"
+                    "Invalid n_jobs parameter (passed to sklearn NearestNeighbors). It has to be integer >= -1. "
                 )
         
 
@@ -487,21 +488,19 @@ class FlexNbhdEstimator(BaseEstimator):
         nbhd_indices: if nbhd_type == 'custom', dict(landmark: list of nbhd indices)
 
         """
-        #check arrays here
-
-
+    
         
-        self.fit_pw(
+        self._fit_pw(
             X,
             y=None,
             nbhd_indices=nbhd_indices,
         )
 
-        if self.pw_dim: self.aggr()
+        if self.pw_dim: self._aggr()
 
         return self
 
-    def fit_pw(
+    def _fit_pw(
         self,
         X,
         y=None,
@@ -536,7 +535,7 @@ class FlexNbhdEstimator(BaseEstimator):
             self.is_fitted_pw_ = True
 
             if self.smooth_flag:
-                self.smooth(nbhd_indices)
+                self._smooth(nbhd_indices)
         else:
             self.is_fitted_ = True
         
@@ -586,9 +585,9 @@ class FlexNbhdEstimator(BaseEstimator):
 
         return indices, radial_dist
 
-    def aggr(self):
+    def _aggr(self):
         # computes self.dimension_ from self.dimension_pw_
-        if self.is_fitted_pw_:
+        if self.pw_dim and self.is_fitted_pw_:
             if self.comb == "mean":
                 self.dimension_ = np.nanmean(
                     self.dimension_pw_
@@ -606,11 +605,12 @@ class FlexNbhdEstimator(BaseEstimator):
 
         return None
 
-    def smooth(self, nbhd_indices = None):
+    def _smooth(self, nbhd_indices = None):
         # compute smoothed local estimates (aggregate over local neighbourhoods)
         # To do: fix inconsistency if not all members of neighbourhood have local estimates! currently skipped them
         # Note that even if no dimension estimate is given for point, if nbhd has non-nan dimension estimates, we still return an aggregation
-        if self.is_fitted:
+
+        if self.pw_dim and self.is_fitted:
 
             self.dimension_pw_smooth_ = []
 
@@ -636,7 +636,6 @@ class FlexNbhdEstimator(BaseEstimator):
             self.is_fitted_pw_smooth_ = True
         else:
             raise ValueError("No pointwise dimension fitted.")
-
         return None
 
     def transform(self, X=None):
@@ -668,7 +667,7 @@ class FlexNbhdEstimator(BaseEstimator):
         ).dimension_
 
     def transform_pw(self, X=None):
-        """Return an array of pointwise ID estimates after a previous call to self.fit_pw
+        """Return an array of pointwise ID estimates after a previous call to self._fit_pw
 
         Parameters
         ----------
@@ -679,7 +678,7 @@ class FlexNbhdEstimator(BaseEstimator):
         dimension_pw : np.array
             Pointwise ID estimates
         dimension_pw_smooth : np.array
-            If self.fit_pw(smooth=True), additionally returns smoothed pointwise ID estimates
+            If self._fit_pw(smooth=True), additionally returns smoothed pointwise ID estimates
         """
 
         check_is_fitted(
