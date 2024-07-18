@@ -81,9 +81,27 @@ class lPCA(FlexNbhdEstimator):
         PFan=0.95,
         verbose=True,
         fit_explained_variance=False,
-        **kwargs
+        nbhd_type="knn",
+        pt_nbhd_incl_pt=True,
+        metric="euclidean",
+        comb="mean",
+        smooth=False,
+        n_jobs=1,
+        radius=1.0,
+        n_neighbors=5,
     ):
-        super().__init__(**kwargs)
+        super().__init__(
+            pw_dim=True,
+            nbhd_type=nbhd_type,
+            pt_nbhd_incl_pt=pt_nbhd_incl_pt,
+            metric=metric,
+            comb=comb,
+            smooth=smooth,
+            n_jobs=n_jobs,
+            radius=radius,
+            n_neighbors=n_neighbors,
+            sort_radial=False,
+        )
         self.ver = ver
         self.alphaRatio = alphaRatio
         self.alphaFO = alphaFO
