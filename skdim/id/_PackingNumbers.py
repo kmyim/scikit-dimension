@@ -30,22 +30,35 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-
 from sklearn.utils.validation import check_array, check_is_fitted
-
+from scipy.spatial import distance
 import numpy as np
 import statistics
-from .._commonfuncs import  GlobalEstimator
+import math
+
+from .._commonfuncs import GlobalEstimator
 
 
 class PackingNumbers(GlobalEstimator):
     """Intrinsic dimension estimation using the Packing Numbers method.
-        References:
+        References: Intrinsic Dimension Estimation Using Packing Numbers
+        by Balázs Kégl
+        https://proceedings.neurips.cc/paper/2002/hash/1177967c7957072da3dc1db4ceb30e7a-Abstract.html
     """
     
-    def __init__(self, r1=1, r2=None, accuracy=1e-7, metric="euclidean", iter_number=10):
+    def __init__(self, r1=1, r2=2, accuracy=0.9, metric="euclidean", iter_number=10):
         """Initialize the GRIDE object.
         Parameters
+        r1 : float, default=1
+            The first radius used for calculating the r-packing number.
+        r2 : float, default=1
+            The second radius used for calculating the r-packing number.
+        accuracy : float, default=0.9
+            The accuracy of the estimation.
+        metric : string, default="euclidean"
+            The metric used for calculating the distance between points.
+        iter_number : int, default=10
+            The number of iterations used for the estimation. For each iteration data is shuffled.
         ----------
         """
         self.r1 = r1
@@ -55,9 +68,7 @@ class PackingNumbers(GlobalEstimator):
         self.iter_number = iter_number
     
     def fit(self, X, y=None):
-        """Implementation of single and multi scale intrinsic dimension estimation using the GRIDE algorithm.
-        Mutli-scale estimation is performed when self.range_max is not None.
-        Single scale estimation is performed always
+        """Fit Packing Numbers estimator.
         Parameters
         ----------
         X : {array-like}, shape (n_samples, n_features)
@@ -83,24 +94,26 @@ class PackingNumbers(GlobalEstimator):
             raise ValueError("iter_number must be positive")
         
     def _aproximate_dim_with_packing_numbers(self, X):
-        iter_counter = 1
+        iter_counter = 0
         log_packing_numbers = [[], []]
         LOG_RS_DIFF = np.log(self.r2) - np.log(self.r1)
+        RADIUSES = [self.r1, self.r2]
         while True:
+            iter_counter += 1
             perm_set = np.random.permutation(X)
             for k in range(2):
-                centers = set()
+                centers = []
                 for i in range(len(perm_set)):
                     is_not_covered = True
                     for j in range(len(centers)):
-                        if distance.cdist([perm_set[i]], [centers[j]], metric=metric)[0][0] < radius:
+                        if distance.cdist([perm_set[i]], [centers[j]], metric=self.metric)[0][0] < RADIUSES[k]:
                             is_not_covered = False
                             break
-                    if not is_not_covered:
+                    if is_not_covered:
                         centers.append(perm_set[i])
                 log_packing_numbers[k].append(np.log(len(centers)))
             d_pack = (statistics.mean(log_packing_numbers[0]) - statistics.mean(log_packing_numbers[1])) / LOG_RS_DIFF
             if iter_counter > self.iter_number:
                 if (math.sqrt(statistics.variance(log_packing_numbers[0]) + statistics.variance(log_packing_numbers[1]))
-                    / (math.sqrt(iter_counter) * LOG_RS_DIFF ))  < d_pack * (1.0 -self.accuracy) / 2:
+                    / (math.sqrt(iter_counter) * LOG_RS_DIFF ))  <= d_pack * (1.0 -self.accuracy) / 2:
                     return d_pack

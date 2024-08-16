@@ -223,3 +223,9 @@ def test_gride_params(data):
     x = skdim.id.Gride(metric="minkowski").fit(data)
     x = skdim.id.Gride().fit_transform(data)
     x = skdim.id.Gride(range_max=32).fit(data).transform_multiscale()
+
+def test_packing_numbers_params(data):
+    x = skdim.id.PackingNumbers().fit(data)
+    x = skdim.id.PackingNumbers(r1=1, r2=2).fit(data)
+    x = skdim.id.PackingNumbers(accuracy=0.1).fit(data)
+    x = skdim.id.PackingNumbers(iter_number=10).fit(data)
