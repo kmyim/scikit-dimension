@@ -22,6 +22,9 @@ def test_wrong_r1_r2_values_are_not_accepted(data):
     with pytest.raises(ValueError):
         g =PackingNumbers(r1=-1)
         g.fit(data)
+    with pytest.raises(ValueError):
+        g =PackingNumbers(r1=-5, r2=5)
+        g.fit(data)
 
 def test_wrong_iter_number_value_is_not_accepted(data):
     with pytest.raises(ValueError):

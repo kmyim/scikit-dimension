@@ -47,7 +47,7 @@ class PackingNumbers(GlobalEstimator):
     """
     
     def __init__(self, r1=1, r2=2, accuracy=0.9, metric="euclidean", iter_number=10):
-        """Initialize the GRIDE object.
+        """Initialize the Packing Numbers estimator.
         Parameters
         r1 : float, default=1
             The first radius used for calculating the r-packing number.
@@ -86,6 +86,8 @@ class PackingNumbers(GlobalEstimator):
         return self
     
     def _check_params(self):
+        if self.r1 == self.r2:
+            raise ValueError("r1 and r2 must be different")
         if self.r2 <= 0 or self.r1 <= 0:
             raise ValueError("r1 and r2 must be positive")
         if self.accuracy <= 0:
@@ -98,6 +100,7 @@ class PackingNumbers(GlobalEstimator):
         log_packing_numbers = [[], []]
         LOG_RS_DIFF = np.log(self.r2) - np.log(self.r1)
         RADIUSES = [self.r1, self.r2]
+        MAX_ITER = 10 * self.iter_number
         while True:
             iter_counter += 1
             perm_set = np.random.permutation(X)
@@ -115,5 +118,5 @@ class PackingNumbers(GlobalEstimator):
             d_pack = (statistics.mean(log_packing_numbers[0]) - statistics.mean(log_packing_numbers[1])) / LOG_RS_DIFF
             if iter_counter > self.iter_number:
                 if (math.sqrt(statistics.variance(log_packing_numbers[0]) + statistics.variance(log_packing_numbers[1]))
-                    / (math.sqrt(iter_counter) * LOG_RS_DIFF ))  <= d_pack * (1.0 -self.accuracy) / 2:
+                    / (math.sqrt(iter_counter) * LOG_RS_DIFF ))  <= d_pack * (1.0 -self.accuracy) / 2 or iter_counter >= MAX_ITER:
                     return d_pack
