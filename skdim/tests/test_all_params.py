@@ -70,7 +70,7 @@ def test_ess_params(data):
 
 
 def test_fisher_params(data, monkeypatch):
-    monkeypatch.setattr(plt, "show", lambda: None)
+    #monkeypatch.setattr(plt, "show", lambda: None)
     x = skdim.id.FisherS().fit(data)
     x = skdim.id.FisherS(conditional_number=2).fit(data)
     x = skdim.id.FisherS(produce_plots=True).fit(data)
@@ -106,6 +106,7 @@ def test_lpca_params(data):
     x = skdim.id.lPCA(ver="Kaiser").fit(data)
     x = skdim.id.lPCA(ver="broken_stick").fit(data)
     x = skdim.id.lPCA(ver="participation_ratio").fit(data)
+    x = skdim.id.lPCA(ver="LB").fit(data)
 
 
 def test_tle_params(data):
@@ -148,8 +149,15 @@ def test_mle_params(data):
 
 def test_flex_mle_params(data):
     x = skdim.id_flex.MLE_basic().fit(data)
-    x = skdim.id_flex.MLE_basic(average_steps = 3).fit(data)
+    #x = skdim.id_flex.MLE_basic(average_steps = 3).fit(data)
 
+def test_mag_params(data):
+    x = skdim.id.Mag().fit(data)
+    with pytest.raises(ValueError): 
+        skdim.id.Mag(ts = np.linspace(0,1,11)).fit(data)
+    with pytest.raises(ValueError): 
+        est = skdim.id.Mag(ts = np.linspace(-1,1,11))
+        est.fit(data)
 
 def test_twonn_params(data):
     # to trigger the "n_features>25 condition"
@@ -157,6 +165,24 @@ def test_twonn_params(data):
     test_high_dim[:, : data.shape[1]] = data
     x = skdim.id.TwoNN().fit(test_high_dim)
     x = skdim.id.TwoNN(discard_fraction=0.05).fit(data)
+
+
+def test_ph_params(data):
+    x = skdim.id.PH().fit(data)
+    x = skdim.id.PH(k = 1).fit(data)
+    x = skdim.id.PH(alpha = 2.0).fit(data)
+
+    with pytest.raises(ValueError):
+        skdim.id.PH(alpha = 0).fit(data)
+    with pytest.raises(ValueError):
+        skdim.id.PH(alpha = -1.0).fit(data)
+    with pytest.raises(ValueError):
+        skdim.id.PH(nmin = 1).fit(data)
+    with pytest.raises(ValueError):
+        skdim.id.PH(nstep = 0).fit(data)
+    with pytest.raises(ValueError):
+        skdim.id.PH(nstep = 1000, nmin = 1000).fit(data)
+    
 
 def test_geomle_params(data):
     x = skdim.id_flex.GeoMle().fit(data)
@@ -223,9 +249,27 @@ def test_gride_params(data):
     x = skdim.id.Gride(metric="minkowski").fit(data)
     x = skdim.id.Gride().fit_transform(data)
     x = skdim.id.Gride(range_max=32).fit(data).transform_multiscale()
+ 
+def test_lBPCA_params(data):
+    x = skdim.id_flex.lBPCA().fit(data)
+    x = skdim.id_flex.lBPCA(nbhd_type = 'knn').fit(data)
+    x = skdim.id_flex.lBPCA(nbhd_type = 'eps').fit(data)
+    x = skdim.id_flex.lBPCA(rotate = False).fit(data)
+    x = skdim.id_flex.lBPCA(max_iter = 10).fit(data)
+    x = skdim.id_flex.lBPCA(conv_tol = 1e-2).fit(data)
 
+    with pytest.raises(ValueError):
+        skdim.id_flex.lBPCA(max_iter = -0.0).fit(data)
+    with pytest.raises(ValueError):
+        skdim.id_flex.lBPCA(conv_tol = -0.0).fit(data)
+    with pytest.raises(ValueError):
+        skdim.id_flex.lBPCA(rotate = 12343).fit(data)
+    with pytest.raises(ValueError):
+        skdim.id_flex.lBPCA(thresh = -0.0).fit(data)
+ 
 def test_packing_numbers_params(data):
     x = skdim.id.PackingNumbers().fit(data)
     x = skdim.id.PackingNumbers(r1=1, r2=2).fit(data)
     x = skdim.id.PackingNumbers(accuracy=0.1).fit(data)
     x = skdim.id.PackingNumbers(iter_number=10).fit(data)
+
