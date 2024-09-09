@@ -35,7 +35,25 @@ from sklearn.utils.validation import check_random_state
 from sklearn.datasets import fetch_openml
 from scipy.special import gammainc
 from scipy.integrate import solve_ivp
+from scipy.stats import special_ortho_group
 import matplotlib.pyplot as plt
+
+def random_embedding(data, ext_dim, random = True, state = 12345):
+    """Random isometric embedding of n_points x n_feats data into ext_dim dimensional space"""
+
+    n_pts, native_dim = data.shape
+
+    if native_dim >= ext_dim:
+        raise ValueError("Extrinsic dimension should be greater than native dimension of input data.")
+    else:
+        X = np.zeros([n_pts, ext_dim])
+        X[:,:native_dim] = data
+
+        if random: 
+            rotation = special_ortho_group.rvs(ext_dim, random_state=state)
+            X = X @ rotation
+
+        return X
 
 
 def product(n, sample_1, sample_1_kwargs, sample_2, sample_2_kwargs):

@@ -1,5 +1,7 @@
 import numpy as np
 from importlib import import_module 
+from skdim.datasets import random_embedding, BenchmarkManifolds
+from itertools import product
 
 class Experiments():
     def __init__(self, dataset_name, estimator_name, random_state, n_jobs = 1):
@@ -15,7 +17,7 @@ class Experiments():
         self.ds = getattr(skdim_ds, dataset_name)
         self.es = getattr(skdim_id, estimator_name)
 
-    def basic_dimension_estimate(self, dataset_params, estimator_params, n_repeats):
+    def basic_dimension_estimate(self, dataset_params, estimator_params, n_repeats, verbose = False):
 
         ds_rng = np.random.default_rng(self.random_state) #for reproducibility
         ds_random_seeds = ds_rng.choice(a = 1000*n_repeats, size =  n_repeats, replace = False)
@@ -24,12 +26,13 @@ class Experiments():
 
         for k in range(n_repeats):
             ds_instance = self.ds(random_state = ds_random_seeds[k], **dataset_params)
-            estimator = self.es() # estimator = self.es(**estimator_params)
-            estimator.fit(X = ds_instance, **estimator_params) #estimator.fit(X = ds_instance)
+            estimator = self.es(**estimator_params)
+            estimator.fit(X = ds_instance)
             dim_list.append(estimator.dimension_)
-
-        return np.nanmean(dim_list), np.nanstd(dim_list), np.mean(np.isnan(dim_list))
-    
+        if verbose:
+            return dim_list
+        else:
+            return np.nanmean(dim_list), np.nanstd(dim_list), np.mean(np.isnan(dim_list))
         
     def fix_estimator_vary_n_pts(self, n_range, dataset_params, estimator_params, n_repeats):
 
@@ -49,3 +52,85 @@ class Experiments():
             dim_list.append((np.nanmean(dim_list_n), np.nanstd(dim_list_n), np.mean(np.isnan(dim_list_n))))
 
         return dim_list
+    
+
+def experiment_with_benchmark_parameters(dataset, estimator, estimator_params, error_norm = np.inf, random_state =12345):
+    
+    n_pts, extrinsic_dim = dataset.shape
+    hyperparam_search = experiment_with_param_search(dataset, estimator, estimator_params)
+
+    estimator_train = hyperparameter_on_benchmark(estimator, estimator_params,
+                                                                     n_pts, extrinsic_dim =extrinsic_dim,
+                                                                     random_state = random_state,
+                                                                     error_norm = error_norm,
+                                                                     verbose = False)
+    
+    best_train_params = min(estimator_train.keys(), key = lambda x: estimator_train[x])
+    hyperparam_search = experiment_with_param_search(dataset, estimator, estimator_params)
+
+    return hyperparam_search, best_train_params
+
+
+def hyperparameter_on_benchmark(estimator, estimator_params, 
+                                n_pts, extrinsic_dim, noise_type = "uniform", noise = 0.0, random_state = 12345, 
+                                verbose = False, error_norm = np.inf):
+    
+    benchmark = BenchmarkManifolds(random_state = random_state, noise_type= noise_type)
+    datasets = benchmark.generate('all', n = n_pts, noise = noise)
+
+    for ds in datasets:
+        data = datasets[ds]
+        native_dim = data.shape[1]
+        if native_dim < extrinsic_dim:
+            datasets[ds] = random_embedding(data, extrinsic_dim, random = True, state = random_state)
+    pms_list = [estimator_params[pm] for pm in estimator_params]
+    pms_search_list = product(*pms_list)
+
+    estimator_raw_performance = dict()
+    estimator_performance = dict()
+
+    for pms in pms_search_list:
+        input_pms = {pm: pms[i] for i, pm in enumerate(estimator_params.keys())}
+        est = estimator(**input_pms)
+
+        ds_perf = dict()
+        for ds in datasets:
+            id = benchmark._dict_truth[ds][0]
+            est.fit(X = ds)
+            ds_perf[ds] = (est.dimension_ , id)
+        
+        pm_key = tuple([(pm, input_pms[pm]) for pm in input_pms])
+        
+        estimator_performance[pm_key] = np.linalg.norm([a[1] - a[0] for a in ds_perf.values()], ord = error_norm)
+        estimator_raw_performance[pm_key] = ds_perf
+
+    if verbose:
+        return estimator_raw_performance
+    else:
+        return estimator_performance
+    
+def experiment_with_param_search(data, estimator, estimator_params):
+    
+    pms_list = [estimator_params[pm] for pm in estimator_params]
+    pms_search_list = product(*pms_list)
+
+    hyperparam_search = dict()
+
+    for pms in pms_search_list:
+        input_pms = {pm: pms[i] for i, pm in enumerate(estimator_params.keys())}
+        pm_key = tuple([(pm, input_pms[pm]) for pm in input_pms])
+        est = estimator(**input_pms)
+        est.fit(data)
+        hyperparam_search[pm_key] = est.dimension_
+    
+    return hyperparam_search
+
+
+
+
+        
+        
+     
+        
+
+

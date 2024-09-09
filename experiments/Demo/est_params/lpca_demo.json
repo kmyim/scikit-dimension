@@ -1,0 +1,7 @@
+{
+    "estimator": "lPCA",
+    "est_params": {"nbhd_type": ["knn"], 
+                "metric": ["euclidean"], "n_neighbors": [5,10,15,20,25], "smooth": [false], "comb": ["mean", "median", "hmean"], 
+                "ver": ["FO", "Fan", "maxgap", "ratio", "Kaiser", "broken_stick", "LB"]},
+    "random_seed": 12345
+}
