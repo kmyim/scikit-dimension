@@ -1,7 +1,8 @@
 {
     "estimator": "lPCA",
     "est_params": {"nbhd_type": ["knn"], 
-                "metric": ["euclidean"], "n_neighbors": [5,10,15,20,25], "smooth": [false], "comb": ["mean", "median", "hmean"], 
-                "ver": ["FO", "Fan", "maxgap", "ratio", "Kaiser", "broken_stick", "LB"]},
+                "metric": ["euclidean"], "n_neighbors": [5,10,15, 20, 25, 35], "smooth": [false], "comb": ["mean", "median", "hmean"], 
+                "ver": ["FO", "Fan", "maxgap", "ratio", "participation_ratio", "Kaiser", "broken_stick", "LB"],
+                "n_jobs":[-1]},
     "random_seed": 12345
 }

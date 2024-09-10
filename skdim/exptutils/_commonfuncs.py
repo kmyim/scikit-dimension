@@ -76,10 +76,10 @@ def hyperparameter_on_benchmark(estimator, estimator_params,
                                 verbose = False, error_norm = np.inf):
     
     benchmark = BenchmarkManifolds(random_state = random_state, noise_type= noise_type)
-    datasets = benchmark.generate('all', n = n_pts, noise = noise)
-
-    for ds in datasets:
-        data = datasets[ds]
+    raw_datasets = benchmark.generate('all', n = n_pts, noise = noise)
+    datasets = dict()
+    for ds in raw_datasets:
+        data = raw_datasets[ds]
         native_dim = data.shape[1]
         if native_dim < extrinsic_dim:
             datasets[ds] = random_embedding(data, extrinsic_dim, random = True, state = random_state)
@@ -96,7 +96,7 @@ def hyperparameter_on_benchmark(estimator, estimator_params,
         ds_perf = dict()
         for ds in datasets:
             id = benchmark._dict_truth[ds][0]
-            est.fit(X = ds)
+            est.fit(X = datasets[ds])
             ds_perf[ds] = (est.dimension_ , id)
         
         pm_key = tuple([(pm, input_pms[pm]) for pm in input_pms])

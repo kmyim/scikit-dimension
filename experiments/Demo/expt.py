@@ -1,12 +1,17 @@
 import json
 from skdim.exptutils import experiment_with_benchmark_parameters
-from skdim.datasets import mnist
+from skdim.datasets import mnist, torus, hyperSphere, random_embedding
 from skdim.id_flex import lPCA
 import numpy as np
 
 ## load datasets
-dataset, _ = mnist()
-ds_name = 'mnist'
+#dataset, _ = mnist()
+ds_name = 'hsphere'
+N = 1000
+random_state = 12345
+#dataset = torus(n_points  = 1000, random_state=random_state)
+dataset = hyperSphere(n = N, d=9)
+dataset = random_embedding(dataset, ext_dim = 20,  state=random_state)
 est_params_f = 'lpca_demo'
 with open('est_params/' + est_params_f + '.json', "r") as f: expt_params = json.load(f)
 
