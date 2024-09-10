@@ -1,0 +1,7 @@
+{    
+    "nbhd_type": ["knn"],
+    "n_neighbors": [5, 10, 20, 40, 80, 160],
+    "comb": ["mean", "median", "hmean"], 
+    "smooth": [false],
+    "metric": ["euclidean"]
+}
