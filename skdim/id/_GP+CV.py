@@ -49,3 +49,5 @@ class GPCV(GlobalEstimator):
     def transform(self, data):
         corrint_values = self.fit_corrint(data)
         return self.inverse_function(corrint_values)
+    
+    
