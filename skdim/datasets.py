@@ -683,3 +683,32 @@ class BenchmarkManifolds:
         # Create the final dataset:
         data = np.concatenate([temp1, temp2, temp1, temp2], axis=1)
         return data
+    
+
+
+import scipy
+from sklearn.utils.validation import check_random_state
+from scipy.stats import special_ortho_group
+
+"Function to generate points on SO(n)"
+
+
+
+
+
+def SpecialOrtho(Points, n):
+ 
+ def sample_special_ortho_group(Points):
+
+     samples = []
+     for _ in range(Points):
+        sample = special_ortho_group.rvs(n)
+        samples.append(sample)
+        return np.array(samples)
+    
+     data = np.array(samples)
+
+     flat = data.reshape(data.shape[0],-1)
+
+     return flat
+ return sample_special_ortho_group(Points)
