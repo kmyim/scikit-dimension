@@ -1,7 +1,7 @@
 import numpy as np
 from importlib import import_module 
 from skdim.datasets import random_embedding, BenchmarkManifolds
-from itertools import product
+from itertools import product, chain
 
 class Experiments():
     def __init__(self, dataset_name, estimator_name, random_state, n_jobs = 1):
@@ -83,15 +83,24 @@ def hyperparameter_on_benchmark(estimator, estimator_params,
         native_dim = data.shape[1]
         if native_dim < extrinsic_dim:
             datasets[ds] = random_embedding(data, extrinsic_dim, random = True, state = random_state)
-    pms_list = [estimator_params[pm] for pm in estimator_params]
-    pms_search_list = product(*pms_list)
+    
+    if 'nbhd_type' in estimator_params: #local method
+        pms_search_list = []
+        if 'knn' in estimator_params['nbhd_type']:
+            pms_list = [[(pm, a) for a in estimator_params[pm]] for pm in estimator_params if pm != 'radius']
+            pms_search_list = product(*pms_list)
+        if 'eps' in estimator_params['nbhd_type']:
+            pms_list = [[(pm, a) for a in estimator_params[pm]] for pm in estimator_params if pm != 'n_neighbors']
+            pms_search_list = chain(pms_search_list, product(*pms_list))
+    else: #global method
+        pms_list = [[(pm, a) for a in estimator_params[pm]] for pm in estimator_params]
+        pms_search_list = product(*pms_list)
 
     estimator_raw_performance = dict()
     estimator_performance = dict()
 
     for pms in pms_search_list:
-        input_pms = {pm: pms[i] for i, pm in enumerate(estimator_params.keys())}
-        est = estimator(**input_pms)
+        est = estimator(**dict(pms))
 
         ds_perf = dict()
         for ds in datasets:
@@ -99,8 +108,7 @@ def hyperparameter_on_benchmark(estimator, estimator_params,
             est.fit(X = datasets[ds])
             ds_perf[ds] = (est.dimension_ , id)
         
-        pm_key = tuple([(pm, input_pms[pm]) for pm in input_pms])
-        
+        pm_key = tuple(pms)
         estimator_performance[pm_key] = np.linalg.norm([a[1] - a[0] for a in ds_perf.values()], ord = error_norm)
         estimator_raw_performance[pm_key] = ds_perf
 

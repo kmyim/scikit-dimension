@@ -35,4 +35,4 @@ for ds_params in ds_params_list:
 with open('lPCA_train_params.json', "w") as f: 
     json.dump(ds_best_params, f)
     
-### to do: differnetiate knn and epsilon case in creating product; rescaling datasets by effective knn/quantile
+### to do:   rescaling datasets by effective knn/quantile

@@ -1,7 +1,7 @@
 {    
     "radius": [0.25, 0.5, 0.75, 1.0, 1.25, 1.5],
-    "eps_norm": ["quantile", "knn"],
-    "knn": [5, 10, 20, 40, 80, 160],
+    "nbhd_type": ["quantile", "knn"],
+    "n_neighbors": [5, 10, 20, 40, 80, 160],
     "comb": ["mean", "median", "hmean"], 
     "smooth": [false],
     "metric": ["euclidean"]
