@@ -43,7 +43,7 @@ def random_embedding(data, ext_dim, random = True, state = 12345):
 
     n_pts, native_dim = data.shape
 
-    if native_dim >= ext_dim:
+    if native_dim > ext_dim:
         raise ValueError("Extrinsic dimension should be greater than native dimension of input data.")
     else:
         X = np.zeros([n_pts, ext_dim])

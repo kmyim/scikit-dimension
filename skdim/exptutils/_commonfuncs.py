@@ -1,7 +1,9 @@
 import numpy as np
 from importlib import import_module 
 from skdim.datasets import random_embedding, BenchmarkManifolds
-from itertools import product, chain
+from itertools import product
+from sklearn.neighbors import NearestNeighbors
+from sklearn.metrics import pairwise_distances
 
 class Experiments():
     def __init__(self, dataset_name, estimator_name, random_state, n_jobs = 1):
@@ -54,91 +56,100 @@ class Experiments():
         return dim_list
     
 
-def experiment_with_benchmark_parameters(dataset, estimator, estimator_params, error_norm = np.inf, random_state =12345):
-    
-    n_pts, extrinsic_dim = dataset.shape
-    hyperparam_search = experiment_with_param_search(dataset, estimator, estimator_params)
 
-    estimator_train = hyperparameter_on_benchmark(estimator, estimator_params,
-                                                                     n_pts, extrinsic_dim =extrinsic_dim,
-                                                                     random_state = random_state,
-                                                                     error_norm = error_norm,
-                                                                     verbose = False)
-    
-    best_train_params = min(estimator_train.keys(), key = lambda x: estimator_train[x])
-    hyperparam_search = experiment_with_param_search(dataset, estimator, estimator_params)
-
-    return hyperparam_search, best_train_params
+def best_parameters(performance_dict, criterion= 'quantiles', p = np.inf, q = 0.5):
+    train_opt_params = dict() #stores for each dataset parameter in performance_dict, the best estimator parameters
+    for dataset_pm in performance_dict:
+        est_perf = dict() #for each set of estimator parameters, stores performance
+        for est_params in performance_dict[dataset_pm]:
+            errors = np.array([abs(a[1] - a[2]) for a in performance_dict[dataset_pm][est_params]]) # diff between estimated id and ground truth
+            if criterion == 'norm':
+                est_perf[est_params] = np.linalg.norm(errors, p)
+            elif criterion == 'quantiles':
+                est_perf[est_params] = np.quantile(errors, q)
+        train_opt_params[dataset_pm] = min(est_perf.keys(), key = lambda k: est_perf[k]) #gets estimator parameter that minimises error proxy
+    return train_opt_params
 
 
-def hyperparameter_on_benchmark(estimator, estimator_params, 
-                                n_pts, extrinsic_dim, noise_type = "uniform", noise = 0.0, random_state = 12345, 
-                                verbose = False, error_norm = np.inf):
+
     
-    benchmark = BenchmarkManifolds(random_state = random_state, noise_type= noise_type)
-    raw_datasets = benchmark.generate('all', n = n_pts, noise = noise)
-    datasets = dict()
-    for ds in raw_datasets:
-        data = raw_datasets[ds]
-        native_dim = data.shape[1]
-        if native_dim < extrinsic_dim:
-            datasets[ds] = random_embedding(data, extrinsic_dim, random = True, state = random_state)
+def eval_estimator_parameters_on_benchmark(estimator, dataset_params, estimator_params, random_state = 12345):
+    #outer loop over datasets, then inner loop over parameters, so that each dataset is only generated once
+
+    performance = dict() #catalogue performance of estimators for each (n_pts, extrinsic_dim) pair
+    benchmark = BenchmarkManifolds(random_state = random_state)
+
+    dataset_parameter_space = [[(pm, a) for a in dataset_params[pm]] for pm in dataset_params]
+
+    for dataset_parameters in product(*dataset_parameter_space): #loop over (n_pts, extrinsic_dim) pairs
+        estimator_parameters_perf = dict() #records performance of parameters on each benchmark dataset with (n_pts, extrinsic_dim)
+        input_dataset_params = dict(dataset_parameters)
+        dataset_collection = [ds_name for ds_name in benchmark._dict_truth 
+                              if benchmark._dict_truth[ds_name][1] <=input_dataset_params['extrinsic_dim']] #compatible datasets
+        
+        for ds_name in dataset_collection: #loop over benchmark datasets
+
+            id = benchmark._dict_truth[ds_name][0]
+            performance_on_ds = benchmark_performance(ds_name, benchmark, estimator, estimator_params, random_state = random_state, **input_dataset_params)
+            #dictionary {estimator parameters: estimated id}
+            for est_pms in performance_on_ds:
+                record = (ds_name, performance_on_ds[est_pms], id)
+                if est_pms in estimator_parameters_perf:
+                    estimator_parameters_perf[est_pms].append(record)
+                else:
+                    estimator_parameters_perf[est_pms]= [record]
+
+        performance[dataset_parameters] = estimator_parameters_perf #given (n_pts, extrinsic_dim), performance of estimator paramaters over benchmark datasets
     
-    if 'nbhd_type' in estimator_params: #local method
-        pms_search_list = []
-        if 'knn' in estimator_params['nbhd_type']:
-            pms_list = [[(pm, a) for a in estimator_params[pm]] for pm in estimator_params if pm != 'radius']
-            pms_search_list = product(*pms_list)
+    return performance
+
+def benchmark_performance(dataset_name, benchmark, estimator, estimator_params,  n_pts = 100, extrinsic_dim = 10, noise = 0.0, random_state = 12345):
+    int_dim, ext_dim, _ = benchmark._dict_truth[dataset_name]
+    data = benchmark.generate(dataset_name, n = n_pts, d = int_dim, dim = ext_dim, noise = noise) #generates the benchmark dataset with the default settings
+    data = random_embedding(data, extrinsic_dim, random = True, state = random_state)
+
+    performance = performance_eval(data, estimator, estimator_params)    
+    return performance
+
+    
+def performance_eval(data, estimator, estimator_params):
+
+    eps_radius = None
+    if 'nbhd_type' in estimator_params:
         if 'eps' in estimator_params['nbhd_type']:
-            pms_list = [[(pm, a) for a in estimator_params[pm]] for pm in estimator_params if pm != 'n_neighbors']
-            pms_search_list = chain(pms_search_list, product(*pms_list))
-    else: #global method
-        pms_list = [[(pm, a) for a in estimator_params[pm]] for pm in estimator_params]
-        pms_search_list = product(*pms_list)
+            eps_radius = {k: normalise_scale(data, metric = 'euclidean', n_neighbors = k, aggr = 'median', n_jobs = -1) for k in estimator_params['n_neighbors']}
+            #future work: relax from euclidean
+            
+    pms_list = [[(pm, a) for a in estimator_params[pm]] for pm in estimator_params]
 
-    estimator_raw_performance = dict()
-    estimator_performance = dict()
-
-    for pms in pms_search_list:
-        est = estimator(**dict(pms))
-
-        ds_perf = dict()
-        for ds in datasets:
-            id = benchmark._dict_truth[ds][0]
-            est.fit(X = datasets[ds])
-            ds_perf[ds] = (est.dimension_ , id)
-        
-        pm_key = tuple(pms)
-        estimator_performance[pm_key] = np.linalg.norm([a[1] - a[0] for a in ds_perf.values()], ord = error_norm)
-        estimator_raw_performance[pm_key] = ds_perf
-
-    if verbose:
-        return estimator_raw_performance
+    performance = {pms: basic_estimation(data, estimator, pms, eps_radius = eps_radius) for pms in product(*pms_list)}
+    return performance
+            
+def basic_estimation(dataset, estimator, estimator_params, eps_radius = None):
+    input_params = dict(estimator_params)
+    if 'nbhd_type' in input_params:
+        if input_params['nbhd_type'] == 'eps':
+            est = estimator(radius = eps_radius[input_params['n_neighbors']], **input_params)
+        else:
+            est = estimator(**input_params)
     else:
-        return estimator_performance
+        est = estimator(**input_params)
+    est.fit(X = dataset)
+
+    return est.dimension_
+
+
+
+
+def normalise_scale(data, metric = 'euclidean', n_neighbors = 10, aggr = 'median', n_jobs = 1, **kwargs):
+    nn = NearestNeighbors(n_neighbors=n_neighbors, metric=metric, n_jobs = n_jobs, **kwargs)
+    nn.fit(data)
+    dists, _= nn.kneighbors(X=data, n_neighbors=n_neighbors, return_distance=True)
+    if aggr == 'median':
+        scale = np.median(dists[:,-1])
+    elif aggr == 'hmean':
+        scale = np.hmean(dists[:,-1])
+    else:
+        scale = np.mean(dists[:,-1])
     
-def experiment_with_param_search(data, estimator, estimator_params):
-    
-    pms_list = [estimator_params[pm] for pm in estimator_params]
-    pms_search_list = product(*pms_list)
-
-    hyperparam_search = dict()
-
-    for pms in pms_search_list:
-        input_pms = {pm: pms[i] for i, pm in enumerate(estimator_params.keys())}
-        pm_key = tuple([(pm, input_pms[pm]) for pm in input_pms])
-        est = estimator(**input_pms)
-        est.fit(data)
-        hyperparam_search[pm_key] = est.dimension_
-    
-    return hyperparam_search
-
-
-
-
-        
-        
-     
-        
-
-
+    return scale

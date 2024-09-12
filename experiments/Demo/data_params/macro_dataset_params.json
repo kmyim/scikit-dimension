@@ -7,7 +7,6 @@
         },
     "object_params": 
         {
-            "random_state": 12345,
-            "noise_type": "uniform"
+            "random_state": 12345
         }
 }

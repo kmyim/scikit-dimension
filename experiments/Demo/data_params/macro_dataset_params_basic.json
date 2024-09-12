@@ -1,0 +1,13 @@
+{
+    "generator_params": 
+        {
+            "n_pts": [625, 1250],
+            "extrinsic_dim": [25, 50],
+            "noise": [0.0]
+        },
+    "object_params": 
+        {
+            "random_state": 12345,
+            "noise_type": "uniform"
+        }
+}

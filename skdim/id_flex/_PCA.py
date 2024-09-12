@@ -125,17 +125,17 @@ class lPCA(FlexNbhdEstimator):
                 # Asynchronously apply the `fit` function to each data point and collect the results
                 results = parallel(
                     delayed(self._pcaLocalDimEst)(np.take(X, nbhd, 0))
-                    for nbhd in nbhd_indices
+                    for nbhd in nbhd_indices if len(nbhd) > 1
                 )
         else:
-            results = [self._pcaLocalDimEst(np.take(X, nbhd, 0)) for nbhd in nbhd_indices]
+            results = [self._pcaLocalDimEst(np.take(X, nbhd, 0)) for nbhd in nbhd_indices if len(nbhd) > 1]
         
         self.dimension_pw_ = np.array([result[0] for result in results])
         if self.verbose: self.additional_data_ = [result[1] for result in results ]
 
     def _pcaLocalDimEst(self, X):
         N = X.shape[0]
-        if N > 0:
+        if N > 1:
             if self.fit_explained_variance:
                 explained_var = X
             else:
@@ -158,6 +158,8 @@ class lPCA(FlexNbhdEstimator):
                 return self._broken_stick(explained_var)
             elif self.ver == 'LB':
                 return self._laplace(explained_var, N)
+        elif N <= 1:
+            return 0, np.nan
         else:
             return np.nan, np.nan
 
