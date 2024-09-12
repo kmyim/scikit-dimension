@@ -249,7 +249,7 @@ def test_gride_params(data):
     x = skdim.id.Gride(metric="minkowski").fit(data)
     x = skdim.id.Gride().fit_transform(data)
     x = skdim.id.Gride(range_max=32).fit(data).transform_multiscale()
-
+ 
 def test_lBPCA_params(data):
     x = skdim.id_flex.lBPCA().fit(data)
     x = skdim.id_flex.lBPCA(nbhd_type = 'knn').fit(data)
@@ -266,3 +266,10 @@ def test_lBPCA_params(data):
         skdim.id_flex.lBPCA(rotate = 12343).fit(data)
     with pytest.raises(ValueError):
         skdim.id_flex.lBPCA(thresh = -0.0).fit(data)
+ 
+def test_packing_numbers_params(data):
+    x = skdim.id.PackingNumbers().fit(data)
+    x = skdim.id.PackingNumbers(r1=1, r2=2).fit(data)
+    x = skdim.id.PackingNumbers(accuracy=0.1).fit(data)
+    x = skdim.id.PackingNumbers(iter_number=10).fit(data)
+
