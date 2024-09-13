@@ -33,7 +33,6 @@ import numpy as np
 import pandas as pd
 from sklearn.utils.validation import check_random_state
 from sklearn.datasets import fetch_openml
-from scipy.special import gammainc
 from scipy.integrate import solve_ivp
 import matplotlib.pyplot as plt
 
@@ -346,7 +345,7 @@ def swissRoll3Sph(n_swiss, n_sphere, a=1, b=2, nturn=1.5, h=4, random_state=None
 def toroidal_spiral(n, n_twists=20, r1=1.0, r2=0.25, random_state=None):
     if not r1 > r2:
         raise ValueError("The radii must satisfy r1 > r2.")
-    phi_sample = hyperBall(n=n, d=1, radius=2 * np.pi, random_state=random_state)
+    phi_sample = hyperBall(n=n, d=1, radius=2 * np.pi, random_state=random_state).reshape([-1,1])
     u = np.hstack((r1 * np.cos(phi_sample), r1 * np.sin(phi_sample), np.zeros([n, 1])))
     v = r2 * (
         np.cos(phi_sample * n_twists) * u
@@ -356,12 +355,12 @@ def toroidal_spiral(n, n_twists=20, r1=1.0, r2=0.25, random_state=None):
     return u + v
 
 
-def torus(n_points, r1=1.0, r2=0.25, random_state=None):
+def torus(n, r1=1.0, r2=0.25, random_state=None):
     """Generates a uniform sample from the 2d torus.
 
     Parameters
     ----------
-    n_points: int
+    n: int
         Number of data points to sample.
     r1: float, default=1.0
         Radius of central circle
@@ -378,11 +377,11 @@ def torus(n_points, r1=1.0, r2=0.25, random_state=None):
     random_state = check_random_state(random_state)
 
     data = np.ndarray((0, 3))
-    while data.shape[0] < n_points:
-        num_to_sample = n_points - data.shape[0]
+    while data.shape[0] < n:
+        num_to_sample = n - data.shape[0]
 
-        phi_sample = random_state.rand(num_to_sample) * 2 * np.pi
-        theta_sample = random_state.rand(num_to_sample) * 2 * np.pi
+        phi_sample = random_state.rand(num_to_sample,1) * 2 * np.pi
+        theta_sample = random_state.rand(num_to_sample,1) * 2 * np.pi
 
         u = np.hstack(
             (
@@ -408,7 +407,7 @@ def torus(n_points, r1=1.0, r2=0.25, random_state=None):
     return data
 
 
-def lorenz_attractor(n_points=10000, tmax=100.0):
+def lorenz_attractor(n=10000, tmax=100.0):
     """Generates a sample from the Lorenz attractor.
 
     This method incorporates code by Christian Hill, January 2016 and January 2021
@@ -416,7 +415,7 @@ def lorenz_attractor(n_points=10000, tmax=100.0):
 
     Parameters
     ----------
-    n_points: int
+    n: int
         Number of data points to sample.
     tmax: float, default=100.0
         Time to run dynamical system
@@ -437,7 +436,7 @@ def lorenz_attractor(n_points=10000, tmax=100.0):
         wp = -beta * w + u * v
         return up, vp, wp
 
-    t_eval = np.linspace(0, tmax, n_points)
+    t_eval = np.linspace(0, tmax, n)
     soln = solve_ivp(
         lorenz,
         (0, tmax),
@@ -488,7 +487,7 @@ def dumbbell(n, connecting_radius=0.1, random_state=None):
             raise ValueError(out_of_bounds_message)
 
     dumbbell_surface = SurfaceOfRevolution(profile_function, random_state=random_state)
-    return dumbbell_surface.sample_points(n_points=n)
+    return dumbbell_surface.generate(n=n)
 
 
 class HilbertCurve:
@@ -498,8 +497,8 @@ class HilbertCurve:
 
     Methods
     -------
-    generate(n_points, depth=2)
-        Generates n_points of data from a curve with recursion of the given depth.
+    generate(n, depth=2)
+        Generates n of data from a curve with recursion of the given depth.
     """
 
     def __init__(self, random_state=None):
@@ -554,26 +553,26 @@ class HilbertCurve:
         point = start + (end - start) * (fractional)
         return point
 
-    def generate(self, n_points, depth=2):
+    def generate(self, n, depth=2):
         """Generates points on a Hilbert curve.
 
         Parameters
         ----------
-        n_points: int
+        n: int
             The number of points to generate.
         depth: int, default=2
             The number of recursive steps to take in approximating the curve.
 
         Returns
         -------
-        data: np.array, (n_points x 3)
+        data: np.array, (n x 3)
             Generated data.
         """
         if not isinstance(depth, int) or depth < 1:
             raise TypeError("The variable 'depth' must be a positive integer.")
         side_length = np.power(2, depth)
         self._make_curve(side_length)
-        parameters = self.random_state.rand(n_points, 1)
+        parameters = self.random_state.rand(n, 1)
         data = np.apply_along_axis(self._point_from_parameter, 1, parameters)
         return data
 
@@ -1048,7 +1047,7 @@ class BenchmarkManifolds:
 class SurfaceOfRevolution:
     """Implementation of surfaces of revolution."""
 
-    def __init__(self, func, how="x", xmin=-1.0, xmax=1.0, random_state=None):
+    def __init__(self, func = lambda x: np.sin(x*np.pi), how="x", xmin=-1.0, xmax=1.0, random_state=None):
         """
         Create a surface of revolution which is symmetric around the x-axix.
 
@@ -1111,18 +1110,18 @@ class SurfaceOfRevolution:
 
         return xvals, fvals, f_prime_vals, jacobian_vals
 
-    def sample_points(self, n_points=10000):
+    def generate(self, n=10000):
         """
         Sample n points from the surface of revolution.
-        :param n_points: the number of points to sample
+        :param n: the number of points to sample
         :return: an array of shape (n, 3), the sampled points.
         """
         jac_max = np.max(self.jacobian_vals)
         jac_min = np.min(self.jacobian_vals)
         if jac_min < jac_max:
             accepted_x = []
-            while len(accepted_x) < n_points:
-                points_to_calculate = n_points - len(accepted_x)
+            while len(accepted_x) < n:
+                points_to_calculate = n - len(accepted_x)
                 generated_x = self.random_state.uniform(
                     self.xmin, self.xmax, size=points_to_calculate
                 )
@@ -1132,8 +1131,8 @@ class SurfaceOfRevolution:
                     [accepted_x, generated_x[rejection_parameter < jacobian]]
                 )
         else:
-            accepted_x = self.random_state.uniform(self.xmin, self.xmax, size=n_points)
-        theta = np.random.uniform(0, 2 * np.pi, n_points)
+            accepted_x = self.random_state.uniform(self.xmin, self.xmax, size=n)
+        theta = np.random.uniform(0, 2 * np.pi, n)
         f = np.interp(accepted_x, self.xvals, self.fvals)
 
         if self.how == "x":
