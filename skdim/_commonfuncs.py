@@ -797,6 +797,8 @@ class LocalEstimator(BaseEstimator):  # , metaclass=DocInheritorBase):
             self.dimension_ = np.mean(self.dimension_pw_)
         elif comb == "median":
             self.dimension_ = np.median(self.dimension_pw_)
+        elif comb =='hmean':
+            self.dimension_ = np.power(np.mean(np.power(self.dimension_pw_, -1)),-1)
         else:
             raise ValueError("Invalid comb parameter. It has to be 'mean' or 'median'")
 

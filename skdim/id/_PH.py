@@ -43,9 +43,10 @@ class PH(GlobalEstimator):
     reg_: sklearn.linear_model.LinearRegression
         regression object used to fit line to log E vs log n
     """
-    def __init__(self,  alpha = 1.0, n_range = (0.5, 1), range_type = 'fraction', nsteps = 100, subsamples = 10, metric = 'euclidean', random_state =12345):
+    def __init__(self,  alpha = 1.0, n_range_min = 0.5, n_range_max = 1, range_type = 'fraction', nsteps = 100, subsamples = 10, metric = 'euclidean', random_state =12345):
         self.alpha = alpha
-        self.n_range = n_range
+        self.n_range_min = n_range_min
+        self.n_range_max = n_range_max
         self.range_type = range_type
         self.nsteps = nsteps
         self.subsamples = subsamples
@@ -70,10 +71,10 @@ class PH(GlobalEstimator):
             Regression score
         """
         if self.range_type == 'fraction':
-            self.nmin = int(np.ceil(self.n_range[0] * X.shape[0]))
-            self.nmax = int(np.ceil(self.n_range[1] * X.shape[0]))
+            self.nmin = int(np.ceil(self.n_range_min * X.shape[0]))
+            self.nmax = int(np.ceil(self.n_range_max * X.shape[0]))
         elif self.range_type == 'num':
-            self.nmin, self.nmax = self.n_range
+            self.nmin, self.nmax = self.n_range_min, self.n_range_max
         else:
             raise ValueError("range_type should either be 'fraction', or 'num'.")
         
