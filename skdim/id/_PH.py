@@ -67,8 +67,8 @@ class PH(GlobalEstimator):
             Returns self.
         self.dimension_: float
             The estimated intrinsic dimension
-        self.score_: float
-            Regression score
+        self.reg_: object
+            sklearn LinearRegression object
         """
         if self.range_type == 'fraction':
             self.nmin = int(np.ceil(self.n_range_min * X.shape[0]))
@@ -112,6 +112,8 @@ class PH(GlobalEstimator):
         elif isinstance(self.alpha, float) or isinstance(self.alpha, int):
             reg = LinearRegression(fit_intercept = True).fit(self.x_, self.y_.reshape([-1]))
             dim = np.divide(self.alpha,(1-reg.coef_[0]))
+        
+        self.reg_ = reg
 
         return dim
     
