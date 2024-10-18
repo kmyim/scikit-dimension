@@ -31,6 +31,7 @@
 #
 import numpy as np
 from scipy.special import loggamma
+from scipy.stats import hmean
 from sklearn.decomposition import PCA
 from sklearn.utils.validation import check_array
 from sklearn.utils.parallel import Parallel, delayed
@@ -54,7 +55,7 @@ class lPCA(FlexNbhdEstimator):
     Parameters
     ----------
     ver: str, default='FO'
-        Version. Possible values: 'FO', 'Fan', 'maxgap','ratio', 'Kaiser', 'broken_stick'.
+        Version. Possible values: 'FO', 'Fan', 'maxgap','ratio', 'Kaiser', 'broken_stick', 'LB'.
     alphaRatio: float in (0,1)
         Only for ver = 'ratio'. ID is estimated to be
         the number of principal components needed to retain at least alphaRatio of the variance.
@@ -76,7 +77,7 @@ class lPCA(FlexNbhdEstimator):
     def __init__(
         self,
         ver="FO",
-        alphaRatio=0.05,
+        alphaRatio=0.8,
         alphaFO=0.05,
         alphaFan=10,
         betaFan=0.8,
@@ -113,6 +114,8 @@ class lPCA(FlexNbhdEstimator):
         self.verbose = verbose
         self.fit_explained_variance = fit_explained_variance
 
+        self.threshold_list = ['FO', 'Fan', 'maxgap','ratio','participation_ratio', 'Kaiser', 'broken_stick', 'LB']
+
     def _fit(self, X, nbhd_indices, radial_dists):
 
         if self.fit_explained_variance:
@@ -129,9 +132,12 @@ class lPCA(FlexNbhdEstimator):
                 )
         else:
             results = [self._pcaLocalDimEst(np.take(X, nbhd, 0)) for nbhd in nbhd_indices]
-        
-        self.dimension_pw_ = np.array([result[0] for result in results])
-        if self.verbose: self.additional_data_ = [result[1] for result in results ]
+        if isinstance(self.ver, list) or self.ver == 'all':
+            self.dimension_pw_ = [{k: dic[k][0] for k in dic} for dic in results]
+            if self.verbose: self.additional_data_ = [{k: dic[k][1] for k in dic} for dic in results]
+        else:
+            self.dimension_pw_ = np.array([result[0] for result in results])
+            if self.verbose: self.additional_data_ = [result[1] for result in results ]
 
     def _pcaLocalDimEst(self, X):
         N = X.shape[0]
@@ -141,28 +147,65 @@ class lPCA(FlexNbhdEstimator):
             else:
                 pca = PCA().fit(X)
                 explained_var = pca.explained_variance_
-
-            if self.ver == "FO":
-                return self._FO(explained_var)
-            elif self.ver == "Fan":
-                return self._fan(explained_var)
-            elif self.ver == "maxgap":
-                return self._maxgap(explained_var)
-            elif self.ver == "ratio":
-                return self._ratio(explained_var)
-            elif self.ver == "participation_ratio":
-                return self._participation_ratio(explained_var)
-            elif self.ver == "Kaiser":
-                return self._Kaiser(explained_var)
-            elif self.ver == "broken_stick":
-                return self._broken_stick(explained_var)
-            elif self.ver == 'LB':
-                return self._laplace(explained_var, N)
+            if isinstance(self.ver, list):
+                admissable_inputs = [s for s in self.ver if s in  self.threshold_list]
+                if len(admissable_inputs) <0:
+                    raise ValueError("Threshold methods must either be 'FO', 'Fan', 'maxgap','ratio','participation_ratio', 'Kaiser', 'broken_stick', or 'LB'. ")
+                else:
+                    return {s: self._threshold(s, N, explained_var) for s in admissable_inputs}
+            elif self.ver == 'all':
+                return {s: self._threshold(s, N, explained_var) for s in self.threshold_list}
+            elif self.ver in self.threshold_list:
+                return self._threshold_list(self.ver, explained_var)
+            else:
+                raise ValueError("Threshold methods must either be 'FO', 'Fan', 'maxgap','ratio','participation_ratio', 'Kaiser', 'broken_stick', or 'LB'. ")
         elif N == 1:
-            return 0, np.nan
+            if isinstance(self.ver, list):
+                admissable_inputs = [s for s in self.ver if s in  self.threshold_list]
+                if len(admissable_inputs) <0:
+                    raise ValueError("Threshold methods must either be 'FO', 'Fan', 'maxgap','ratio','participation_ratio', 'Kaiser', 'broken_stick', or 'LB'. ")
+                else:
+                    return {s: (0, np.nan) for s in admissable_inputs}
+            elif self.ver == 'all':
+                return {s: (0, np.nan) for s in self.threshold_list}
+            elif self.ver in self.threshold_list:
+                return (0, np.nan)
+            else:
+                raise ValueError("Threshold methods must either be 'FO', 'Fan', 'maxgap','ratio','participation_ratio', 'Kaiser', 'broken_stick', or 'LB'. ")
         else:
-            return np.nan, np.nan
+            if isinstance(self.ver, list):
+                admissable_inputs = [s for s in self.ver if s in  self.threshold_list]
+                if len(admissable_inputs) <0:
+                    raise ValueError("Threshold methods must either be 'FO', 'Fan', 'maxgap','ratio','participation_ratio', 'Kaiser', 'broken_stick', or 'LB'. ")
+                else:
+                    return {s: (np.nan, np.nan) for s in admissable_inputs}
+            elif self.ver == 'all':
+                return {s: (np.nan, np.nan) for s in self.threshold_list}
+            elif self.ver in self.threshold_list:
+                return (np.nan, np.nan)
+            else:
+                raise ValueError("Threshold methods must either be 'FO', 'Fan', 'maxgap','ratio','participation_ratio', 'Kaiser', 'broken_stick', or 'LB'. ")
 
+    def _threshold(self, s, N, explained_var):
+        if s == "FO":
+            return self._FO(explained_var)
+        elif s == "Fan":
+            return self._fan(explained_var)
+        elif s == "maxgap":
+            return self._maxgap(explained_var)
+        elif s == "ratio":
+            return self._ratio(explained_var)
+        elif s == "participation_ratio":
+            return self._participation_ratio(explained_var)
+        elif s == "Kaiser":
+            return self._Kaiser(explained_var)
+        elif s == "broken_stick":
+            return self._broken_stick(explained_var)
+        elif s == 'LB':
+            return self._laplace(explained_var, N)
+        else:
+            raise ValueError("Threshold methods must either be FO', 'Fan', 'maxgap','ratio','participation_ratio', 'Kaiser', 'broken_stick', 'LB'. ")
+    
     def _FO(self, explained_var):
         de = sum(explained_var > (self.alphaFO * explained_var[0]))
         gaps = explained_var[:-1] / explained_var[1:]
@@ -305,3 +348,31 @@ class lPCA(FlexNbhdEstimator):
         s += ehatinvdiffterm_a
         s[:l] += ehatinvdiffterm_b
         return -s/2
+    
+    def _aggr(self): #override aggregation in parent class
+        # computes self.dimension_ from self.dimension_pw_
+
+        if self.pw_dim and self.is_fitted_pw_:
+            if isinstance(self.dimension_pw_[0], dict):
+                self.dimension_ = dict()
+                self.dimension_per_method_ = dict()
+                for k in self.dimension_pw_[0].keys():
+                    self.dimension_per_method_[k] = np.array([pt[k] for pt in self.dimension_pw_])
+                    self.dimension_[k] = self._aggr_filt(self.comb,self.dimension_per_method_[k])
+            else:
+                self.dimension_ = self._aggr_filt(self.comb, self.dimension_pw_)
+
+            self.is_fitted_ = True
+        else:
+            raise ValueError("No pointwise dimension fitted.")
+
+        return None
+
+    def _aggr_filt(self, s, data):
+        if s == "mean":
+            return np.nanmean(data)
+        elif s == "median":
+            return np.nanmedian(data)
+        elif s == "hmean":
+            return hmean(data, nan_policy="omit")
+    
