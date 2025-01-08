@@ -690,25 +690,35 @@ import scipy
 from sklearn.utils.validation import check_random_state
 from scipy.stats import special_ortho_group
 
-"Function to generate points on SO(n)"
+"""
+Generates samples on SO(n)
+
+Parameters:
+
+num_samples: int
+    Number of points from SO(n)
+
+n: int
+    The n from SO(n), giving an n(n-1)/2 ID and a n^2 ambiant dimension
+
+
+
+Returns
+    -------
+    data: np.array, (num_samples x n^2)
+        Generated data
+"""
 
 
 
 
 
-def SpecialOrtho(Points, n):
- 
- def sample_special_ortho_group(Points):
-
-     samples = []
-     for _ in range(Points):
+def SpecialOrth(num_samples, n):
+   
+    samples = []
+    for _ in range(num_samples):
         sample = special_ortho_group.rvs(n)
         samples.append(sample)
-        return np.array(samples)
-    
-     data = np.array(samples)
-
-     flat = data.reshape(data.shape[0],-1)
-
-     return flat
- return sample_special_ortho_group(Points)
+        data = np.array(samples)
+        flattened_samples = data.reshape(data.shape[0], -1)
+    return flattened_samples
