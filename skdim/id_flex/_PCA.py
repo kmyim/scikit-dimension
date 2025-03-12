@@ -54,7 +54,7 @@ class lPCA(FlexNbhdEstimator):
     Parameters
     ----------
     ver: str, default='FO'
-        Version. Possible values: 'FO', 'Fan', 'maxgap','ratio', 'Kaiser', 'broken_stick'.
+        Version. Possible values: 'FO', 'Fan', 'maxgap','ratio', 'participation_ratio', 'Kaiser', 'broken_stick', 'LB'.
     alphaRatio: float in (0,1)
         Only for ver = 'ratio'. ID is estimated to be
         the number of principal components needed to retain at least alphaRatio of the variance.

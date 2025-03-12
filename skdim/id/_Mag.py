@@ -16,10 +16,12 @@ class Mag(GlobalEstimator):
     ----------  
     ts: list or one-dim array of positive floats
         Range of scale parameters
-    k: None or integer
+    k_scales: None or integer
         If not none, then takes the median knn distance d_k and normalises the scale parameters by t -> t/d_k
     metric: str
         scipy.spatial.distance metric parameter
+    m_jobs: int
+        number of parallel jobs
    
 
     Attributes
@@ -31,9 +33,12 @@ class Mag(GlobalEstimator):
         Regression object used to fit line to log tM vs log t
     """
     def __init__(self, ts = np.linspace(0.5,5.5,21), k_scales = None, metric = 'euclidean', n_jobs = -1):
+
         self.ts = np.array(ts)
+
         self.metric = metric
         self.k_scales = k_scales
+
         self.n_jobs = n_jobs
 
     def fit(self, X, y=None):
@@ -69,6 +74,12 @@ class Mag(GlobalEstimator):
     def _MagDimEst(self, X):
 
         D = squareform(pdist(X))
+        
+        if self.k_scales is None:
+            y = [self._mag(D, t) for t in self.ts]
+            self.y_ = np.log(y)
+            reg = LinearRegression(fit_intercept = True).fit(np.log(self.ts).reshape(-1, 1), self.y_)
+            return reg.coef_[0], reg
 
         if isinstance(self.k_scales, int):
 
