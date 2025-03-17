@@ -5,11 +5,23 @@ from functools import reduce
 from scipy.spatial.distance import pdist, squareform
 from scipy.sparse import csr_array
 from scipy.sparse.csgraph import minimum_spanning_tree
+from scipy.cluster.hierarchy import DisjointSet
 
 from sklearn.utils.validation import check_array
 from sklearn.linear_model import LinearRegression
 
 from .._commonfuncs import GlobalEstimator
+
+def Krukskal(vertices, edges, alpha = 1.0):
+    #assume edges sorted
+    total_persistence = 0
+    djs = DisjointSet(vertices)
+    for u,v, weight in edges:
+        if djs[u] != djs[v]:
+            total_persistence += weight ** alpha
+            djs.merge(djs[u],  djs[v])
+    return total_persistence
+
 
 
 class PH(GlobalEstimator):
