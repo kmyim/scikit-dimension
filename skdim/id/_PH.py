@@ -1,7 +1,10 @@
 import numpy as np
 import random
 from functools import reduce
+from itertools import combinations  
 
+from sklearn.utils.parallel import Parallel, delayed
+from joblib import effective_n_jobs
 from scipy.spatial.distance import pdist, squareform
 from scipy.sparse import csr_array
 from scipy.sparse.csgraph import minimum_spanning_tree
@@ -11,18 +14,6 @@ from sklearn.utils.validation import check_array
 from sklearn.linear_model import LinearRegression
 
 from .._commonfuncs import GlobalEstimator
-
-def Krukskal(vertices, edges, alpha = 1.0):
-    #assume edges sorted
-    total_persistence = 0
-    djs = DisjointSet(vertices)
-    for u,v, weight in edges:
-        if djs[u] != djs[v]:
-            total_persistence += weight ** alpha
-            djs.merge(djs[u],  djs[v])
-    return total_persistence
-
-
 
 class PH(GlobalEstimator):
     """Intrinsic dimension estimation using the PHdim algorithm. 
@@ -55,7 +46,7 @@ class PH(GlobalEstimator):
     reg_: sklearn.linear_model.LinearRegression
         regression object used to fit line to log E vs log n
     """
-    def __init__(self,  alpha = 1.0, n_range_min = 0.5, n_range_max = 1, range_type = 'fraction', nsteps = 100, subsamples = 10, metric = 'euclidean', random_state =12345):
+    def __init__(self,  alpha = 1.0, n_range_min = 0.5, n_range_max = 1, range_type = 'fraction', nsteps = 100, subsamples = 10, metric = 'euclidean', random_state =12345, n_jobs = 1):
         self.alpha = alpha
         self.n_range_min = n_range_min
         self.n_range_max = n_range_max
@@ -64,6 +55,7 @@ class PH(GlobalEstimator):
         self.subsamples = subsamples
         self.metric = metric 
         self.random_state = random_state
+        self.n_jobs = n_jobs
 
     def fit(self, X, y=None):
         """
@@ -101,17 +93,17 @@ class PH(GlobalEstimator):
         # `fit` should always return `self`
         return self
 
+
     def _phEst(self, X):
 
         random.seed(self.random_state)
-        
-        D = squareform(pdist(X))
-        D = np.triu(D)
+        n = X.shape[0]
+        edges, sort_idx = self._sort_distances(X)
 
-        E = np.vstack([self._ph(D, n) for n in self.subsamplerange])
-        #E = np.array(reduce(lambda xs, ys: xs + ys, E)) #flatten
+        E = self._ph(n, edges, sort_idx)
 
-        x = np.repeat(self.subsamplerange, self.subsamples).reshape([-1,1])
+        x = np.array([nss for nss in self.subsamplerange for _ in range(self.subsamples)]).reshape([-1,1])
+        #x = np.repeat(self.subsamplerange, self.subsamples).reshape([-1,1])
 
         self.x_ = np.log(x)
         self.y_ = np.log(E)
@@ -129,17 +121,19 @@ class PH(GlobalEstimator):
 
         return dim
     
-    def _ph(self, D, n):
+    def _ph(self, num_points, distances, sort_idx):
 
-        NUMPOINTS = D.shape[0]
-        y = []
-        for _ in range(self.subsamples):
-            idx = random.sample(range(NUMPOINTS),n)
-            D_sample = csr_array(D[idx,:][:,idx])
-            T = minimum_spanning_tree(D_sample)
-            y.append(np.sum(np.power(T.data.reshape([-1,1]), np.array(self.alpha).reshape([1,-1])), axis = 0))
+        if effective_n_jobs(self.n_jobs) > 1:
+            with Parallel(n_jobs=self.n_jobs) as parallel:
+                total_persistence = parallel(
+                    delayed(self._ph_subsample)(num_points, nss, distances, sort_idx)
+                    for nss in self.subsamplerange for _ in range(self.subsamples)
+                )
+        else:
+            total_persistence = [self._ph_subsample(num_points, nss, distances, sort_idx)for nss in self.subsamplerange for _ in range(self.subsamples)]
 
-        return np.array(y)
+
+        return np.array(total_persistence)
 
 
     def _check_params(self, X):
@@ -149,17 +143,60 @@ class PH(GlobalEstimator):
         elif isinstance(self.alpha, float) or isinstance(self.alpha, int):
             if self.alpha <= 0:
                 raise ValueError("Alpha power parameter must be a strictly positive.")
-        if self.nmin <= 1  or not isinstance(self.nmin, int):
-            raise ValueError("Min subsample population size must be an integer > 1.")
+        if self.range_type == 'num':
+            if self.n_range_min <= 1  or not isinstance(self.nmin, int):
+                raise ValueError("Min subsample population size must be an integer > 1.")
+            if self.n_range_max < self.n_range_min or not isinstance(self.nmax, int):
+                raise ValueError("Max subsample population size must be an integer greater than than the min subsample population size.")
+        elif self.range_type =='fraction':
+            if self.n_range_max < self.n_range_min :
+                raise ValueError("Max subsample population fraction must be in (0,1] greater than than the min subsample fraction.")
+            if (self.n_range_max > 1) or (self.n_range_max <= 0):
+                raise ValueError("Max subsample population fraction must be in (0,1] greater than than the min subsample fraction.")
+            if (self.n_range_min > 1) or (self.n_range_min <= 0):
+                raise ValueError("Max subsample population fraction must be in (0,1] greater than than the min subsample fraction.")
         if self.nsteps < 2 or not isinstance(self.nsteps, int):
             raise ValueError("Nsteps must be an integer >= 2.")
         if self.subsamples < 1  or not isinstance(self.subsamples, int):
             raise ValueError("Min number of subsamples must be an integer >= 1.")
-        if self.nmax < self.nmin or not isinstance(self.nmax, int):
-            raise ValueError("Max subsample population size must be an integer greater than than the min subsample population size.")
+        
         if self.nmin > X.shape[0]:
             raise ValueError("Minimum subsample population size greater than number of points.")
         if self.nmax > X.shape[0]:
             raise ValueError("Maximum subsample population size greater than number of points.")
         if len(self.subsamplerange) < 2:
             raise ValueError("Subsample population range has fewer than two points, modify range of N or nstep to ensure there is a line to be fitted!")
+    
+
+    def _ph_subsample(self,num_points, num_subsamples, distances, sort_idx):
+        subsample_indices = random.sample(range(num_points),num_subsamples) #randomly choose subsamples
+        edge_filt = self._subsample_filter_edges(num_points, subsample_indices, sort_idx)
+        filtered_edges = [distances[e] for e in edge_filt]
+        return self._Krukskal(subsample_indices, filtered_edges, self.alpha)
+    
+    @staticmethod
+    def _sort_distances(X):
+        Ds = pdist(X)
+        filt_idx = np.triu_indices(n = X.shape[0], k = 1)
+        sort_idx = np.argsort(Ds)
+        return list(zip(filt_idx[0], filt_idx[1], Ds)), sort_idx
+    
+    @staticmethod
+    def _subsample_filter_edges(n, subsample_indices, edge_order):
+        filt =[False for _ in range(n*(n-1)//2)] # records whether edge of a certian index is included
+        for u,v in combinations(subsample_indices, 2): #unique pairs:
+            i,j = sorted([u,v]) # make sure u < v
+            k = j-1 + i*(n-1) - i*(i+1) //2 #index in edge list
+            filt[k] = True
+        return [k for k in edge_order if filt[k]]
+
+    @staticmethod 
+    def _Krukskal(vertices, edges, alpha = 1.0):
+        #assume edges sorted
+        total_persistence = np.zeros_like(alpha)
+        djs = DisjointSet(vertices)
+        for u,v, weight in edges:
+            if djs[u] != djs[v]: # if roots distinct
+                total_persistence += np.power(weight, alpha)
+                djs.merge(djs[u],  djs[v]) # repoint roots
+        return total_persistence
