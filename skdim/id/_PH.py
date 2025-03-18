@@ -3,8 +3,7 @@ import random
 from functools import reduce
 from itertools import combinations  
 
-from sklearn.utils.parallel import Parallel, delayed
-from joblib import effective_n_jobs
+from joblib import effective_n_jobs, Parallel, delayed
 from scipy.spatial.distance import pdist, squareform
 from scipy.sparse import csr_array
 from scipy.sparse.csgraph import minimum_spanning_tree
@@ -123,7 +122,7 @@ class PH(GlobalEstimator):
     
     def _ph(self, num_points, distances, sort_idx):
 
-        if effective_n_jobs(self.n_jobs) > 1:
+        if self.n_jobs> 1:
             with Parallel(n_jobs=self.n_jobs) as parallel:
                 total_persistence = parallel(
                     delayed(self._ph_subsample)(num_points, nss, distances, sort_idx)
