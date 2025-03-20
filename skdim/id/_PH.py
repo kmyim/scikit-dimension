@@ -2,6 +2,8 @@ import numpy as np
 import random
 from functools import reduce
 from itertools import combinations  
+from collections.abc import Iterable
+
 
 from joblib import effective_n_jobs, Parallel, delayed
 from scipy.spatial.distance import pdist, squareform
@@ -107,26 +109,27 @@ class PH(GlobalEstimator):
         self.x_ = np.log(x)
         self.y_ = np.log(E)
 
-        if isinstance(self.alpha, list) or isinstance(self.alpha, tuple):
+        ###check the array propagation in this bit!
+        if isinstance(self.alpha, float) or isinstance(self.alpha, int):
+            reg = LinearRegression(fit_intercept = True).fit(self.x_, self.y_.reshape([-1]))
+            dim = np.divide(self.alpha,(1-reg.coef_[0]))
+        elif isinstance(self.alpha, Iterable):
             dim = []
             for k in range(len(self.alpha)):
                 reg = LinearRegression(fit_intercept = True).fit(self.x_, self.y_[:,k])
                 dim.append(np.divide(self.alpha[k],(1-reg.coef_[0])))
-        elif isinstance(self.alpha, float) or isinstance(self.alpha, int):
-            reg = LinearRegression(fit_intercept = True).fit(self.x_, self.y_.reshape([-1]))
-            dim = np.divide(self.alpha,(1-reg.coef_[0]))
         
         self.reg_ = reg
 
         return dim
     
     def _ph(self, num_points, distances, sort_idx):
-
-        if self.n_jobs> 1:
+        flatten_double_loop = [nss for nss in self.subsamplerange for _ in range(self.subsamples)]
+        if isinstance(self.n_jobs, int) and self.n_jobs != 0:
             with Parallel(n_jobs=self.n_jobs) as parallel:
                 total_persistence = parallel(
                     delayed(self._ph_subsample)(num_points, nss, distances, sort_idx)
-                    for nss in self.subsamplerange for _ in range(self.subsamples)
+                    for nss in flatten_double_loop
                 )
         else:
             total_persistence = [self._ph_subsample(num_points, nss, distances, sort_idx)for nss in self.subsamplerange for _ in range(self.subsamples)]
