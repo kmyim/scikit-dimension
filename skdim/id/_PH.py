@@ -7,7 +7,7 @@ from collections.abc import Iterable
 
 from joblib import effective_n_jobs, Parallel, delayed
 from scipy.spatial.distance import pdist, squareform
-from scipy.sparse import csr_array, coo_array
+from scipy.sparse import csr_array, coo_array, dok_array
 from scipy.sparse.csgraph import minimum_spanning_tree
 from scipy.cluster.hierarchy import DisjointSet
 
@@ -394,7 +394,15 @@ class PH_knn(GlobalEstimator):
     
     @staticmethod
     def _sort_distances(X, n_neighbors = 10, metric = 'euclidean', n_jobs = 1):
-        Gc = coo_array(kneighbors_graph(X,n_neighbors=n_neighbors, mode = 'distance', metric = metric, n_jobs = n_jobs))
+        G = dok_array(kneighbors_graph(X,n_neighbors=n_neighbors, mode = 'distance', metric = metric, n_jobs = n_jobs))  #NB Not symmetric 
+        n = X.shape[0]
+        #flip all entries of asymmetric matrix above diagonal
+        G_upper = dok_array((n,n))
+        for i,j in G.keys():
+            u,v = min(i,j), max(i,j)
+            G_upper[(u,v)] = G[(i,j)] 
+        #obtain edges indexed over u < v
+        Gc = coo_array(G_upper)
         sort_ind = np.argsort(Gc.data)
         row, col, dat = Gc.row[sort_ind], Gc.col[sort_ind], Gc.data[sort_ind]
         return (row, col, dat)
