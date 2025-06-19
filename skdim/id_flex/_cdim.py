@@ -83,11 +83,13 @@ class CDim(FlexNbhdEstimator):
                 for i in range(len(nbhd)):
                     if i in label:
                         continue
+                    new_label = label + [i]
+                    if new_label in new_label_set:
+                        continue
                     for vec_idx in label:
                         if T[i][vec_idx] >= 0:
                             break
                     else:
-                        new_label = label + [i]
                         new_label_set.append(new_label)
             label_set = new_label_set
         return de

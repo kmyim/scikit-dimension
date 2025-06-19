@@ -169,19 +169,24 @@ def test_twonn_params(data):
 
 def test_ph_params(data):
     x = skdim.id.PH().fit(data)
-    x = skdim.id.PH(k = 1).fit(data)
+    x = skdim.id.PH(alpha = (0.5, 1.0, 1.5)).fit(data)
     x = skdim.id.PH(alpha = 2.0).fit(data)
+    x = skdim.id.PH(n_jobs = 10).fit(data)
 
     with pytest.raises(ValueError):
         skdim.id.PH(alpha = 0).fit(data)
     with pytest.raises(ValueError):
         skdim.id.PH(alpha = -1.0).fit(data)
     with pytest.raises(ValueError):
-        skdim.id.PH(nmin = 1).fit(data)
+        skdim.id.PH(n_range_min = 1, range_type = 'num').fit(data)
     with pytest.raises(ValueError):
-        skdim.id.PH(nstep = 0).fit(data)
+        skdim.id.PH(nsteps = 0).fit(data)
     with pytest.raises(ValueError):
-        skdim.id.PH(nstep = 1000, nmin = 1000).fit(data)
+        skdim.id.PH(nsteps = 1000, n_range_min = 1000, range_type = 'num').fit(data)
+    with pytest.raises(ValueError):
+        skdim.id.PH(nsteps = 10, n_range_min = -0.1,  n_range_max = 1.0, range_type = 'fraction').fit(data)
+    with pytest.raises(ValueError):
+        skdim.id.PH(nsteps = 10, n_range_min = 0.5, n_range_max = 1.1, range_type = 'fraction').fit(data)
     
 
 def test_geomle_params(data):
