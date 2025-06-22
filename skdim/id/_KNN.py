@@ -223,7 +223,6 @@ class KNNb(GlobalEstimator):
         '''
         Extracts dimension estimate for k = 1,..., max_k
         '''
-        random.seed(self.random_state)
         np.random.seed(self.random_state)
         N = X.shape[0]
         length_scaling = []
@@ -241,7 +240,7 @@ class KNNb(GlobalEstimator):
         self.x_ = np.log(self._subsamplerange).reshape(-1,1)
         self.reg_ =[]
         for i in range(self.max_k):
-            est = LinearRegression().fit(self.x_, length_scaling[i])
+            est = LinearRegression().fit(self.x_, self.y_[i].reshape(-1,1))
             self.reg_.append(est)
             id.append(1/(1-est.coef_[0]))
         return id
@@ -281,7 +280,7 @@ class KNNb(GlobalEstimator):
             raise ValueError("Maximum subsample population should be greater than one.")
         if self.nmin >= self.nmax:
             raise ValueError("Maximum subsample population should be greater than minimum subsample population.")
-        if len(self.subsamplerange) < 2:
+        if len(self._subsamplerange) < 2:
             raise ValueError("Subsample population range has fewer than two points, modify range of N or nstep to ensure there is a line to be fitted!")
         if not isinstance(self.n_jobs, int):
             raise ValueError("n_jobs must be integer.")
