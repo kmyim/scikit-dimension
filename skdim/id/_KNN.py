@@ -171,7 +171,7 @@ class KNNb(GlobalEstimator):
         list of regression object used to fit line to log L_k vs log n
     """
 
-    def __init__(self,  max_k = 30, n_range_min = 0.75, n_range_max = 1, range_type = 'fraction', nsteps = 10, subsamples = 10, metric = 'euclidean', random_state =12345,  n_jobs = 1):
+    def __init__(self,  max_k = 1, n_range_min = 0.75, n_range_max = 1, range_type = 'fraction', nsteps = 10, subsamples = 10, metric = 'euclidean', random_state =12345,  n_jobs = 1):
         self.max_k = max_k
         self.n_range_min = n_range_min
         self.n_range_max = n_range_max
@@ -290,7 +290,7 @@ class KNNb(GlobalEstimator):
     
     @staticmethod
     def _knn_length(X, k = 30, n_jobs = -1, metric = 'euclidean'):
-        kdist, kidx = NearestNeighbors(n_neighbors = k+1, n_jobs= n_jobs, metric = metric).fit(X).kneighbors(X)
+        kdist, kidx = NearestNeighbors(n_neighbors = k, n_jobs= n_jobs, metric = metric).fit(X).kneighbors(X)
         kdist= kdist[:,1:]
         kidx = kidx[:,1:]
         rank_dict = dict()
