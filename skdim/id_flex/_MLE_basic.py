@@ -9,7 +9,7 @@ class MLE_basic(FlexNbhdEstimator):
 
     Parameters
     ----------
-    average_steps : Number of different values of k (number of neighbours) used 
+    average_steps : Number of different values of k (number of distinct neighbours) used 
     '''
         
 

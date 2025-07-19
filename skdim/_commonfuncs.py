@@ -437,10 +437,10 @@ class FlexNbhdEstimator(BaseEstimator):
         else:
             if self.nbhd_type == "knn":
                 if isinstance(self.n_neighbors, int):
-                    if self.n_neighbors < 2:
-                        raise ValueError("knn neighbors must be an integer > 1")
+                    if self.n_neighbors < 1:
+                        raise ValueError("knn neighbors must be a positive integer")
                 else:
-                    raise TypeError("knn neighbors must be an integer > 1")
+                    raise TypeError("knn neighbors must be a positive integer")
             elif self.nbhd_type == "eps":
                 if self.radius <= 0:
                     raise ValueError("eps radius must be a positive number")
@@ -557,8 +557,8 @@ class FlexNbhdEstimator(BaseEstimator):
         self.attr_checks()
         
         neigh = NearestNeighbors(
-            metric=self.metric, n_jobs= self.n_jobs, n_neighbors=self.n_neighbors, radius=self.radius
-        )
+            metric=self.metric, n_jobs= self.n_jobs, n_neighbors=self.n_neighbors + 1, radius=self.radius 
+        ) #1st nn is the point itself in NearestNeighbor, so shift it such that NN(2) returns first distinct nearest neighbour
         neigh.fit(X)
 
         if self.nbhd_type == "eps":
