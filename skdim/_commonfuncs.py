@@ -389,7 +389,7 @@ class FlexNbhdEstimator(BaseEstimator):
         smooth: if true, average over dimension estimates of local neighbourhoods using comb
         n_jobs: number of parallel processes in inferring local neighbourhood
         radius: radius parameter for nearest neighbour construction
-        n_neighbors: number of neighbors for k nearest neighbourhood construction
+        n_neighbors: number of neighbors for k nearest neighbourhood construction. Note we follow sklearn, where k = 1 means its own neighbourhood
         """
 
         self.pw_dim = pw_dim 
