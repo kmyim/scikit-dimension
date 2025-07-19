@@ -565,16 +565,16 @@ class FlexNbhdEstimator(BaseEstimator):
             radial_dist, indices = neigh.radius_neighbors(
                 return_distance=True, sort_results=self.sort_radial
             )  # Find eps-nearest neighbors of each data sample
-            if self.pt_nbhd_incl_pt:
-                radial_dist = [np.array([0.0] + list(a)) for a in radial_dist]
-                indices = [np.array([idx] + list(a)) for idx, a in enumerate(indices)]
+            if not self.pt_nbhd_incl_pt: #exclude central point
+                radial_dist = [a[1:] for a in radial_dist]
+                indices = [a[1:] for a in indices]
         elif self.nbhd_type == "knn":
             radial_dist, indices = neigh.kneighbors(
                 return_distance=True
             )  # Find k-nearest neighbors of each data sample
-            if self.pt_nbhd_incl_pt:
-                radial_dist = np.hstack((np.zeros([radial_dist.shape[0],1]), radial_dist))
-                indices =  np.hstack((np.arange(indices.shape[0]).reshape([-1,1]), indices))
+            if not self.pt_nbhd_incl_pt:
+                radial_dist = radial_dist[:,1:]
+                indices =  indices[:,1:]
         else:
             raise ValueError("Neighbourhood type should either be knn or eps")
 
