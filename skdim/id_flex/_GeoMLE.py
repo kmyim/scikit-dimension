@@ -1,10 +1,8 @@
 from .._commonfuncs import FlexNbhdEstimator
-from sklearn.linear_model import LinearRegression, Ridge
-from sklearn.metrics import DistanceMetric
-from sklearn.metrics.pairwise import pairwise_distances
+from sklearn.linear_model import Ridge
 import numpy as np
 
-from joblib import effective_n_jobs, Parallel, delayed
+from joblib import Parallel, delayed
 
 class GeoMle(FlexNbhdEstimator):
     def __init__(self, k1 = 5, k2= 7, bootstrap_num = 20, alpha = 5e-3, interpolation_degree = 2,
