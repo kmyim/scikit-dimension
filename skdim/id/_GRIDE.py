@@ -81,6 +81,10 @@ class Gride(GlobalEstimator):
             The maximum range of the neighbors to consider in the multi-scale estimation.
         metric : str, default="euclidean"
             The metric to use when calculating distances between points.
+        n_jobs : int, default=1
+            The number of parallel jobs to run for the nearest neighbors search.
+        multiplier : int, default=2
+            The multiplier to use when n2 is None. n2 = multiplier * n1
         """
         self.n_jobs = n_jobs
         self.n1 = n1
