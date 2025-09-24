@@ -63,7 +63,7 @@ class Gride(GlobalEstimator):
             estimators, arXiv preprint arXiv:2104.13832 (2021).
     """
     
-    def __init__(self, n1=1, n2=None, d0=0.001, d1=1000, eps=1e-7, range_max=None, metric="euclidean", n_jobs=1):
+    def __init__(self, n1=1, n2=None, d0=0.001, d1=1000, eps=1e-7, range_max=None, metric="euclidean", n_jobs=1, multiplier = 2):
         """Initialize the GRIDE object.
         Parameters
         ----------
@@ -81,11 +81,15 @@ class Gride(GlobalEstimator):
             The maximum range of the neighbors to consider in the multi-scale estimation.
         metric : str, default="euclidean"
             The metric to use when calculating distances between points.
+        n_jobs : int, default=1
+            The number of parallel jobs to run for the nearest neighbors search.
+        multiplier : int, default=2
+            The multiplier to use when n2 is None. n2 = multiplier * n1
         """
         self.n_jobs = n_jobs
         self.n1 = n1
         if n2 == None:
-            self.n2 = 2 * n1
+            self.n2 = multiplier * n1
         else:
             self.n2 = n2
         self.d0 = d0
