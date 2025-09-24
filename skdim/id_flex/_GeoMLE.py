@@ -10,9 +10,7 @@ class GeoMle(FlexNbhdEstimator):
         comb="mean",
         smooth=False,
         n_jobs=1,
-        random_state = 12345,
-        localfit = True,
-        retain_curves = False):
+        random_state = 12345):
         
         
         """
@@ -37,15 +35,20 @@ class GeoMle(FlexNbhdEstimator):
             Degree of interpolation polynomial. The default is 2.
         weight_reg: float, optional
             weights on points in ridge regression are given by 1/(standard deviation in bootstrap ). The default is 0.5.
+        metric : str, optional
+            Metric to use for distance computation. The default is "euclidean".
+        comb : str, optional
+            Method to combine local dimension estimates. The default is "mean".
+        smooth : bool, optional
+            Whether to apply smoothing to the local dimension estimates. The default is False.
+        n_jobs : int, optional
+            Number of parallel jobs to run. The default is 1.
         random_state: int, optional
             Random seed for bootstrapping 
-        retain_curves: bool, optional
-            If True, retain the curves of MLE estimates, its std, and mean distances vs knn for each point and k. The default is False.
         """
         self.alpha = alpha
         self.max_degree = interpolation_degree
         self.bootstrap_num = bootstrap_num
-        self.localfit = localfit
         
         self.k1 = k1
         self.k2 = k2 
@@ -57,7 +60,6 @@ class GeoMle(FlexNbhdEstimator):
             
         self.random_state = random_state
         self.weight_reg =weight_reg
-        self.retain_curves = retain_curves
 
         super().__init__(
             pw_dim=True,
@@ -84,48 +86,19 @@ class GeoMle(FlexNbhdEstimator):
             raise ValueError("Number of bootstrap sets needs to be a non-negative integer.")
         if self.max_degree <= 0 or not isinstance(self.max_degree, int):
             raise ValueError("Degree of interpolation polynomial has to be a positive integer.")
-        if not isinstance(self.localfit, bool):
-            raise ValueError("Local fit must be boolean.")
+
         np.random.seed(self.random_state)
 
         if isinstance(self.n_jobs, int) and not self.n_jobs in [0,1]:
-            if self.localfit:
-                with Parallel(n_jobs=self.n_jobs) as parallel:
+            with Parallel(n_jobs=self.n_jobs) as parallel:
                     res = parallel(
                         delayed(self.__local_geomle)(r)
                         for r in radial_dists)
-            else:
-                with Parallel(n_jobs=self.n_jobs) as parallel:
-                    res = parallel(
-                        delayed(self._calc_local_mle_all_ks_)(r, self.k1, self.k2)
-                        for r in radial_dists)
         else:
-            if self.localfit:
-                res = [self.__local_geomle(r) for r in radial_dists]
-            else:
-                res = [self._calc_local_mle_all_ks(r, self.k1, self.k2) for r in radial_dists]
+            res = [self._calc_local_mle_all_ks(r, self.k1, self.k2) for r in radial_dists]
         
-        if self.localfit:
-            self.dimension_pw_ = np.array([a[0] for a in res])
-            if self.retain_curves:
-                self.mle_k_pw = np.array([a[1] for a in res])
-                self.mle_k_var = np.array([a[2] for a in res])
-                self.mean_dk = np.array([a[3] for a in res])
-            else:
-                self.mle_k_pw = None
-                self.mle_k_var = None
-                self.mean_dk = None
-        else:
-            self.dimension_pw_ = res
-            dists = np.array([r for row in radial_dists[:,self.k1-1:self.k2] for r in row])
-            X = np.vander(dists, self.max_degree + 1, increasing = True)[:,1:] 
-            y = np.array([r for row in self.dimension_pw_ for r in row])
-            ridge_reg = Ridge(alpha=self.alpha, fit_intercept=True)
-            ridge_reg.fit(X, y)
-            self.dimension_global_ = ridge_reg.intercept_
-            if self.retain_curves:
-                self.dists_ = dists
-                self.regre_coef_ = ridge_reg.coef_
+        self.dimension_pw_ = np.array(res)
+
 
 
     
@@ -169,7 +142,7 @@ class GeoMle(FlexNbhdEstimator):
             var_mle = np.ones_like(mean_mle) # no variance information
         
         
-        return self._calc_local_estimate_from_regression(mean_mle, var_mle, mean_knn_radial_dist[self.k1-1:self.k2]), mean_mle, var_mle, mean_knn_radial_dist[self.k1-1:self.k2]
+        return self._calc_local_estimate_from_regression(mean_mle, var_mle, mean_knn_radial_dist[self.k1-1:self.k2])
 
     def _calc_local_estimate_from_regression(self, mean_mle, var_mle, mean_knn_radial_dist):
         # per point! not over all
