@@ -27,6 +27,8 @@ class GeoMle(FlexNbhdEstimator):
             Lower range (inclusive) of k nearest (distinct) neighbor neighborhood  on which MLE estimate of dimension is computed 
         k2: int, optional
             Upper range (inclusive) of k nearest (distinct) neighbor neighborhood  on which MLE estimate of dimension is computed 
+        bootstrap_nbhd : int, optional
+            Size of neighbourhood (in terms of number of nearest neighbours) used for bootstrapping.
         bootstrap_num : int, optional
             Number of bootstrap sets. The default is 20.
         alpha : float, optional
@@ -76,12 +78,12 @@ class GeoMle(FlexNbhdEstimator):
     def _fit(self, X, nbhd_indices, radial_dists):
 
         # Check if the parameters are valid
-        if not isinstance(self.k1, int) or self.k1 < 3:
-            raise ValueError("k1 should be a positive integer at least 3.")
-        if self.k1 >= self.k2 or not isinstance(self.k2, int) or  self.k1 < 3:
-            raise ValueError("steps needs to be strictly positive integer.")   
+        if not isinstance(self.k1, int) or  self.k1 >= X.shape[0]-1 or self.k1 < 3:
+            raise ValueError("k1 should be a positive integer at least 3 and at most (number of points -2).")
+        if self.k1 >= self.k2 or not isinstance(self.k2, int) or  self.k2 >= X.shape[0] or self.k2 < 3:
+            raise ValueError("k2 needs to be  needs to be a positive integer at least 3 and at most (number of points 1).")   
         if self.bootstrap_nbhd < self.k2 or not isinstance(self.bootstrap_nbhd, int) or  self.bootstrap_nbhd < 3:
-            raise ValueError("Bootstrap neighbourhood must be greater than k1 + steps.")  
+            raise ValueError("Bootstrap neighbourhood must be at least k2.")  
         if self.bootstrap_num < 0 or not isinstance(self.bootstrap_num, int):
             raise ValueError("Number of bootstrap sets needs to be a non-negative integer.")
         if self.max_degree <= 0 or not isinstance(self.max_degree, int):
