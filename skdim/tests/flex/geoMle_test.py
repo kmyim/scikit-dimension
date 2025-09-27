@@ -6,7 +6,7 @@ from geomle import DataGenerator
 
 __K1 = 20
 __K2 = 55
-#__AVG_STEPS = __K2 - __K1 + 1
+__AVG_STEPS = __K2 - __K1 + 1
 
 @pytest.fixture
 def data():
@@ -54,7 +54,7 @@ def test_on_swiss_sphere():
     DG = DataGenerator()
     for i in range(10):
         data = DG.gen_data('Sphere', 1000, 15, 10)
-        GeoMle = skdim.id_flex.GeoMle(k1=__K1, k2 =__K2)
+        GeoMle = skdim.id_flex.GeoMle(k1=__K1, k_steps =__AVG_STEPS)
         GeoMle.fit(data)
         acc += GeoMle.transform()
     assert pytest.approx(acc/10, 0.1) == 10.2
@@ -66,7 +66,7 @@ def test_on_swiss_roll():
     DG = DataGenerator()
     for i in range(10):
         data = DG.gen_data('Roll', 1000, 3, 2)
-        GeoMle = skdim.id_flex.GeoMle(k2 = __K2, bootstrap_num=3, k1 = __K1)
+        GeoMle = skdim.id_flex.GeoMle(k_steps = __AVG_STEPS, bootstrap_num=3, k1 = __K1)
         GeoMle.fit(data)
         acc += GeoMle.transform()
     assert pytest.approx(acc / 10, 0.1) == 2.0
@@ -75,22 +75,22 @@ def test_is_like_original_GeoMle_on_sphere():
     np.random.seed(782)
     DG = DataGenerator()
     data = DG.gen_data('Sphere', 1000, 2, 1)
-    GeoMle = skdim.id_flex.GeoMle(k2 = __K2, k1 = __K1)
+    GeoMle = skdim.id_flex.GeoMle(k_steps = __AVG_STEPS, k1 = __K1)
     GeoMle.fit(data)
-    assert pytest.approx(GeoMle.transform(), 0.05) == gm.geomle(data, __K1, __K2, nb_iter1=1, nb_iter2=20).mean()
+    assert pytest.approx(GeoMle.transform(), 0.05) == gm.geomle(data, __K1, __AVG_STEPS, nb_iter1=1, nb_iter2=20).mean()
 
 def test_is_like_original_GeoMle_on_affine():
     np.random.seed(122)
     DG = DataGenerator()
     data = DG.gen_data('Affine', 1000, 7, 3)
-    GeoMle = skdim.id_flex.GeoMle(k2 = __K2, bootstrap_num=10, k1 = __K1)
+    GeoMle = skdim.id_flex.GeoMle(k_steps = __AVG_STEPS, bootstrap_num=10, k1 = __K1)
     GeoMle.fit(data)
-    assert pytest.approx(GeoMle.transform(), 0.2) == gm.geomle(data, __K1, __K2, nb_iter1=1, nb_iter2=10).mean()
+    assert pytest.approx(GeoMle.transform(), 0.2) == gm.geomle(data, __K1, __AVG_STEPS, nb_iter1=1, nb_iter2=10).mean()
 
 def test_is_like_original_GeoMle_on_spiral():
     np.random.seed(782)
     DG = DataGenerator()
     data = DG.gen_data('Spiral', 1000, 15, 1)
-    GeoMle = skdim.id_flex.GeoMle(k2 = __K2, bootstrap_num=20, k1 = __K1)
+    GeoMle = skdim.id_flex.GeoMle(k_steps = __AVG_STEPS, bootstrap_num=20, k1 = __K1)
     GeoMle.fit(data)
-    assert pytest.approx(GeoMle.transform(), 0.2) == gm.geomle(data, __K1, __K2, nb_iter1=1, nb_iter2=20).mean()
+    assert pytest.approx(GeoMle.transform(), 0.2) == gm.geomle(data, __K1, __AVG_STEPS, nb_iter1=1, nb_iter2=20).mean()

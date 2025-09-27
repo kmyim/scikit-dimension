@@ -5,7 +5,7 @@ import numpy as np
 from joblib import Parallel, delayed
 
 class GeoMle(FlexNbhdEstimator):
-    def __init__(self, k1 = 5, k2 = 10, bootstrap_nbhd = None, bootstrap_num = 20, alpha = 5e-3, interpolation_degree = 2, weight_reg= 1e-3,
+    def __init__(self, k1 = 5, k_steps = 10, bootstrap_nbhd = None, bootstrap_num = 20, alpha = 5e-3, interpolation_degree = 2, weight_reg= 1e-3,
         metric="euclidean",
         comb="mean",
         smooth=False,
@@ -19,24 +19,24 @@ class GeoMle(FlexNbhdEstimator):
         GeoMLE aggregates dimension estimates over a range of k-nearest neighbour sizes (k1,...,k2) using a polynomial regression fitted on bootstrap samples of the MLE estimates.
         We modify the original version so that the bootstrapping is done independently per point on an expanded knn neighbourhood, instead of the whole dataset. 
         This avoids repeated computation of distance matrices or KNN nbhds for each bootstrap sample of the whole dataset. 
-        Compared to implementation by authors, we implement true bootstrapping (described in the true paper) as opposed to sub-sampling without replacement.
+        Compared to implementation by authors, we implement true bootstrapping (described in the paper) as opposed to sub-sampling without replacement.
 
         Parameters
         ----------
         k1: int, optional
             Lower range (inclusive) of k nearest (distinct) neighbor neighborhood  on which MLE estimate of dimension is computed 
-        k2: int, optional
-            Upper range (inclusive) of k nearest (distinct) neighbor neighborhood  on which MLE estimate of dimension is computed 
+        k_steps: int, optional
+            k1 + k_steps is the upper range (inclusive) of k nearest (distinct) neighbor neighborhood, on which MLE estimate of dimension is computed 
         bootstrap_nbhd : int, optional
-            Size of neighbourhood (in terms of number of nearest neighbours) used for bootstrapping.
+            Size of neighbourhood (in terms of number of nearest neighbours) used for bootstrapping. If None, set to k2 + 5. The default is None.
         bootstrap_num : int, optional
-            Number of bootstrap sets. The default is 20.
+            Number of bootstrap sets. The default is 20. If bootstrap_num=0, then equal weights are applied to all points in the subsequent regression step of the estimator.
         alpha : float, optional
             Regularization parameter for Ridge regression. The default is 5e-3.
         interpolation_degree : int, optional
             Degree of interpolation polynomial. The default is 2.
         weight_reg: float, optional
-            weights on points in ridge regression are given by 1/(standard deviation in bootstrap ). The default is 0.5.
+            weights on points in ridge regression are given by 1/max(standard deviation in bootstrap,  weight_reg). The default is weight_reg = 1e-3.
         metric : str, optional
             Metric to use for distance computation. The default is "euclidean".
         comb : str, optional
@@ -53,7 +53,7 @@ class GeoMle(FlexNbhdEstimator):
         self.bootstrap_num = bootstrap_num
         
         self.k1 = k1
-        self.k2 = k2 
+        self.k2 = k1 + k_steps
         
         if bootstrap_nbhd is None:
             self.bootstrap_nbhd = self.k2 + 5 #default neighbourhood for bootstrapping
@@ -81,7 +81,7 @@ class GeoMle(FlexNbhdEstimator):
         if not isinstance(self.k1, int) or  self.k1 >= X.shape[0]-1 or self.k1 < 3:
             raise ValueError("k1 should be a positive integer at least 3 and at most (number of points -2).")
         if self.k1 >= self.k2 or not isinstance(self.k2, int) or  self.k2 >= X.shape[0] or self.k2 < 3:
-            raise ValueError("k2 needs to be  needs to be a positive integer at least 3 and at most (number of points 1).")   
+            raise ValueError("k2 needs to be  needs to be a positive integer at least 3 and at most (number of points - 1).")   
         if self.bootstrap_nbhd < self.k2 or not isinstance(self.bootstrap_nbhd, int) or  self.bootstrap_nbhd < 3:
             raise ValueError("Bootstrap neighbourhood must be at least k2.")  
         if self.bootstrap_num < 0 or not isinstance(self.bootstrap_num, int):
@@ -118,7 +118,6 @@ class GeoMle(FlexNbhdEstimator):
         var_mle = None #store var in mle estimate
         if self.bootstrap_num > 0:
             for _ in range(self.bootstrap_num):
-                ### parallelise this...
                 ## row of radial_list = [d1 ( > 0), d2,...]  ##
                 btstrp_radial_dists = self._bootstrap_order_preserving(radial_dists) #bootstrap resample of NN distances while keeping total order in array
                 btstrp_mle = self._calc_local_mle_all_ks(btstrp_radial_dists, self.k1, self.k2) # mle estimates for nbhds of size k1,...,k2
@@ -141,7 +140,7 @@ class GeoMle(FlexNbhdEstimator):
         else:
             mean_knn_radial_dist = radial_dists # length k2
             mean_mle = self._calc_local_mle_all_ks(radial_dists, self.k1, self.k2) # length (k2- k1+ 1)
-            var_mle = np.ones_like(mean_mle) # no variance information
+            var_mle = np.ones_like(mean_mle) # no bootstrapping, so set variance to 1 to give equal weights in regression
         
         
         return self._calc_local_estimate_from_regression(mean_mle, var_mle, mean_knn_radial_dist[self.k1-1:self.k2])
