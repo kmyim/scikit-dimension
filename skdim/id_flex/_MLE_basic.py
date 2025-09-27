@@ -1,7 +1,7 @@
 import numpy as np
 from .._commonfuncs import FlexNbhdEstimator
 from ..errors import EstimatorFailure
-
+from joblib import Parallel, delayed
 
 class MLE_basic(FlexNbhdEstimator):
     '''
@@ -9,7 +9,7 @@ class MLE_basic(FlexNbhdEstimator):
 
     Parameters
     ----------
-    average_steps : Number of different values of k (number of neighbours) used 
+    average_steps : Number of different values of k (number of distinct neighbours) used 
     '''
         
 
@@ -24,8 +24,21 @@ class MLE_basic(FlexNbhdEstimator):
         #self.average_steps = average_steps #to do: integrate averaging over k neighbourhoods
 
     def _fit(self, X,  nbhd_indices, radial_dists):
-
-        self.dimension_pw_ = np.array([self._mle_formula(dlist) for dlist in radial_dists])
+        if self.nbhd_type == 'knn':
+            if X.shape[0] <= self.n_neighbors:
+                raise ValueError("Number of neighbours needs to be strictly fewer than the number of points.")
+        elif self.nbhd_type == 'eps':
+            min_nbhd_size = np.min([len(dlist) for dlist in radial_dists])
+            if min_nbhd_size == 0:
+                raise ValueError("Some neighbourhoods are empty. Try increasing the radius.")
+        
+        if isinstance(self.n_jobs, int) and not self.n_jobs in [0,1]:
+            with Parallel(n_jobs=self.n_jobs) as parallel:
+                    self.dimension_pw_ = parallel(
+                        delayed(self._mle_formula)(dlist)
+                        for dlist in radial_dists)
+        else:
+            self.dimension_pw_ = np.array([self._mle_formula(dlist) for dlist in radial_dists])
     
     def _mle_formula(self, dlist):
 

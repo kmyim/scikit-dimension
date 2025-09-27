@@ -1,16 +1,68 @@
 from .._commonfuncs import FlexNbhdEstimator
-from sklearn.linear_model import LinearRegression, Ridge
-from sklearn.metrics import DistanceMetric
-from sklearn.metrics.pairwise import pairwise_distances
+from sklearn.linear_model import Ridge
 import numpy as np
 
+from joblib import Parallel, delayed
+
 class GeoMle(FlexNbhdEstimator):
-    def __init__(self, average_steps = 2, bootstrap_num = 20, alpha = 5e-3, interpolation_degree = 2,
+    def __init__(self, k1 = 5, k_steps = 10, bootstrap_nbhd = None, bootstrap_num = 20, alpha = 5e-3, interpolation_degree = 2, weight_reg= 1e-3,
         metric="euclidean",
         comb="mean",
         smooth=False,
         n_jobs=1,
-        n_neighbors=5):
+        random_state = 12345):
+        
+        
+        """
+        Implementation of GeoMLE [Gomtsyan19]. 
+        GeoMLE is a local MLE based estimator that uses bootstrapping and polynomial interpolation to reduce variance and bias of the basic Levina-Bickel MLE.
+        GeoMLE aggregates dimension estimates over a range of k-nearest neighbour sizes (k1,...,k2) using a polynomial regression fitted on bootstrap samples of the MLE estimates.
+        We modify the original version so that the bootstrapping is done independently per point on an expanded knn neighbourhood, instead of the whole dataset. 
+        This avoids repeated computation of distance matrices or KNN nbhds for each bootstrap sample of the whole dataset. 
+        Compared to implementation by authors, we implement true bootstrapping (described in the paper) as opposed to sub-sampling without replacement.
+
+        Parameters
+        ----------
+        k1: int, optional
+            Lower range (inclusive) of k nearest (distinct) neighbor neighborhood  on which MLE estimate of dimension is computed 
+        k_steps: int, optional
+            k1 + k_steps is the upper range (inclusive) of k nearest (distinct) neighbor neighborhood, on which MLE estimate of dimension is computed 
+        bootstrap_nbhd : int, optional
+            Size of neighbourhood (in terms of number of nearest neighbours) used for bootstrapping. If None, set to k2 + 5. The default is None.
+        bootstrap_num : int, optional
+            Number of bootstrap sets. The default is 20. If bootstrap_num=0, then equal weights are applied to all points in the subsequent regression step of the estimator.
+        alpha : float, optional
+            Regularization parameter for Ridge regression. The default is 5e-3.
+        interpolation_degree : int, optional
+            Degree of interpolation polynomial. The default is 2.
+        weight_reg: float, optional
+            weights on points in ridge regression are given by 1/max(standard deviation in bootstrap,  weight_reg). The default is weight_reg = 1e-3.
+        metric : str, optional
+            Metric to use for distance computation. The default is "euclidean".
+        comb : str, optional
+            Method to combine local dimension estimates. The default is "mean".
+        smooth : bool, optional
+            Whether to apply smoothing to the local dimension estimates. The default is False.
+        n_jobs : int, optional
+            Number of parallel jobs to run. The default is 1.
+        random_state: int, optional
+            Random seed for bootstrapping 
+        """
+        self.alpha = alpha
+        self.max_degree = interpolation_degree
+        self.bootstrap_num = bootstrap_num
+        
+        self.k1 = k1
+        self.k2 = k1 + k_steps
+        
+        if bootstrap_nbhd is None:
+            self.bootstrap_nbhd = self.k2 + 5 #default neighbourhood for bootstrapping
+        else: 
+            self.bootstrap_nbhd = bootstrap_nbhd
+            
+        self.random_state = random_state
+        self.weight_reg =weight_reg
+
         super().__init__(
             pw_dim=True,
             nbhd_type="knn",
@@ -18,140 +70,118 @@ class GeoMle(FlexNbhdEstimator):
             comb=comb,
             smooth=smooth,
             n_jobs=n_jobs,
-            n_neighbors=n_neighbors,
-            sort_radial=False
+            n_neighbors= self.bootstrap_nbhd,
+            sort_radial=False, 
+            pt_nbhd_incl_pt=False
         )
-        """
-        Parameters
-        ----------
-        average_steps : int, optional
-            Number of average steps. The default is 2. Estimator considers the k (number of neighbors) between k1 and k1 + average_steps - 1 (including).
-        bootstrap_num : int, optional
-            Number of bootstrap sets. The default is 20.
-        alpha : float, optional
-            Regularization parameter for Ridge regression. The default is 5e-3.
-        interpolation_degree : int, optional
-            Degree of interpolation polynomial. The default is 2.
-        n_neighbors : int, optional
-            Number of neighbors. The default is 5.
-        """
-        self.average_steps = average_steps
-        self.alpha = alpha
-        self.max_degree = interpolation_degree
-        self.bootstrap_num = bootstrap_num
 
     def _fit(self, X, nbhd_indices, radial_dists):
+
         # Check if the parameters are valid
-        if self.average_steps < 0:
-            raise ValueError("Number of average steps can not be negative")
-        if self.bootstrap_num <= 0:
-            raise ValueError("Number of bootstrap sets has to  be positive")
-        if self.max_degree <= 0:
-            raise ValueError("Degree of interpolation polynomial has to be positive")
-        if self.nbhd_type not in ['knn']:
-            raise ValueError('Neighbourhood type should be knn')
+        if not isinstance(self.k1, int) or  self.k1 >= X.shape[0]-1 or self.k1 < 3:
+            raise ValueError("k1 should be a positive integer at least 3 and at most (number of points -2).")
+        if self.k1 >= self.k2 or not isinstance(self.k2, int) or  self.k2 >= X.shape[0] or self.k2 < 3:
+            raise ValueError("k2 needs to be  needs to be a positive integer at least 3 and at most (number of points - 1).")   
+        if self.bootstrap_nbhd < self.k2 or not isinstance(self.bootstrap_nbhd, int) or  self.bootstrap_nbhd < 3:
+            raise ValueError("Bootstrap neighbourhood must be at least k2.")  
+        if self.bootstrap_num < 0 or not isinstance(self.bootstrap_num, int):
+            raise ValueError("Number of bootstrap sets needs to be a non-negative integer.")
+        if self.max_degree <= 0 or not isinstance(self.max_degree, int):
+            raise ValueError("Degree of interpolation polynomial has to be a positive integer.")
+        if self.max_degree >= self.k2 - self.k1 + 1:
+            raise ValueError("Degree of interpolation polynomial must be strictly less than (k_steps + 1).")
+        if self.alpha < 0:
+            raise ValueError("Regularization parameter alpha must be non-negative.")
+        if self.weight_reg <= 0:
+            raise ValueError("weight_reg must be positive.")
+
+        np.random.seed(self.random_state)
+
+        if isinstance(self.n_jobs, int) and not self.n_jobs in [0,1]:
+            with Parallel(n_jobs=self.n_jobs) as parallel:
+                    res = parallel(
+                        delayed(self.__local_geomle)(r)
+                        for r in radial_dists)
+        else:
+            res = [self._calc_local_mle_all_ks(r, self.k1, self.k2) for r in radial_dists]
         
-        k2 = self.n_neighbors + self.average_steps - 1
-        self.dimension_pw_ = self.__geomle(X, self.n_neighbors, k2)
+        self.dimension_pw_ = np.array(res)
+
+
+
     
-    def __geomle(self, X, k1, k2):
-        """
-        Returns range of Levina-Bickel dimensionality estimation for points in X averaged over bootstrap samples
-    
+    def __local_geomle(self, radial_dists):
+        """    
         Input parameters:
-        X            - data
-        k1           - minimal number of nearest neighbours
-        k2           - maximal number of nearest neighbours
-        max_degree   - maximal degree of polynomial regression (Default = 2)
-        metric       - metric for the distance calculation (Default = 'euclidean')
-    
+        radial_dists - radial distances from a single point of query, assume to be sorted
+        
         Returns: 
         array of shape (len(X),) of regression dimensionality estimation for points in X averaged over bootstrap samples
         """
-        if self.metric == 'precomputed':
-            dist = X
-            DIM_SPACE = None
+
+        mean_knn_radial_dist = None #store mean distance
+        mean_mle = None #store mean mle estimate
+        var_mle = None #store var in mle estimate
+        if self.bootstrap_num > 0:
+            for _ in range(self.bootstrap_num):
+                ## row of radial_list = [d1 ( > 0), d2,...]  ##
+                btstrp_radial_dists = self._bootstrap_order_preserving(radial_dists) #bootstrap resample of NN distances while keeping total order in array
+                btstrp_mle = self._calc_local_mle_all_ks(btstrp_radial_dists, self.k1, self.k2) # mle estimates for nbhds of size k1,...,k2
+
+                if mean_knn_radial_dist is None: #initialise
+                    mean_knn_radial_dist = btstrp_radial_dists /self.bootstrap_num # length k2
+                else:
+                    mean_knn_radial_dist += btstrp_radial_dists /self.bootstrap_num #update
+
+                if mean_mle is None:
+                    mean_mle = btstrp_mle / self.bootstrap_num # length (k2- k1+ 1)
+                else:
+                    mean_mle += btstrp_mle / self.bootstrap_num
+                
+                if var_mle is None:
+                    var_mle = btstrp_mle ** 2/ self.bootstrap_num
+                else:
+                    var_mle += btstrp_mle ** 2/ self.bootstrap_num
+            var_mle -=  mean_mle **2 #length (k2- k 1+ 1) subtract mean**2 to get variance from mean(X**2)
         else:
-            DIM_SPACE = X.shape[1]
-            dist = pairwise_distances(X, X, metric=self.metric)
-        NUM_OF_POINTS = X.shape[0]
+            mean_knn_radial_dist = radial_dists # length k2
+            mean_mle = self._calc_local_mle_all_ks(radial_dists, self.k1, self.k2) # length (k2- k1+ 1)
+            var_mle = np.ones_like(mean_mle) # no bootstrapping, so set variance to 1 to give equal weights in regression
+        
+        
+        return self._calc_local_estimate_from_regression(mean_mle, var_mle, mean_knn_radial_dist[self.k1-1:self.k2])
 
-        avg_distances = np.zeros((NUM_OF_POINTS , self.average_steps))
-        mles = np.zeros((NUM_OF_POINTS, self.bootstrap_num, self.average_steps))
-        final_mles = np.zeros(NUM_OF_POINTS)
-        for j in range(self.bootstrap_num):
-            bootstrap_ids = GeoMle.__gen_bootstrap_ids(X)
-            # Calculate distances to nearest neighbours in bootsrap dataset
-            for x_id in range(X.shape[0]):
-                bootstrap_distances_nn = np.sort(GeoMle._get_nearest_distances_in_bootstrap(x_id, dist, bootstrap_ids, k2))
-                # update average distances
-                avg_distances[x_id, :] += bootstrap_distances_nn[k1 - 1:]
-                for k_iter in range(self.average_steps):
-                    # Calculate MLE for bootstrap sample
-                    mles[x_id, j, k_iter] = GeoMle._calc_mle(bootstrap_distances_nn[:k_iter + k1])
-
-        for x_id in range(X.shape[0]):
-            avg_distances[x_id, :] /= self.bootstrap_num # average distances over bootstrap samples
-            mle_means = [mles[x_id,:,k].mean() for k in range(self.average_steps)] # mean MLE over bootstrap samples
-            mle_std_variations = [mles[x_id,:,k].std(ddof=1) for k in range(self.average_steps)] # std MLE for specifik k over bootstrap samples
-            final_mles[x_id] = max(self._calc_estimate_from_regression(mle_means, mle_std_variations, avg_distances[x_id, :]),
-                                    0)
-            if DIM_SPACE is not None:
-                final_mles[x_id] = min(final_mles[x_id], DIM_SPACE)
-        return final_mles
-    
-    @staticmethod
-    def __gen_bootstrap_ids(data):
-        return np.unique(np.random.randint(0, len(data) - 1, size=len(data)))
-    
-    def _calc_estimate_from_regression(self, mle_means, mle_std_variations, avg_distances):
-        X = np.zeros((self.average_steps, self.max_degree))
-        weights = [st ** -1 for st in mle_std_variations]
-        for k_iter in range(self.average_steps):
-            X[k_iter] = [avg_distances[k_iter]**i for i in range(1, self.max_degree + 1)]
+    def _calc_local_estimate_from_regression(self, mean_mle, var_mle, mean_knn_radial_dist):
+        # per point! not over all
+        weights = np.divide(1, np.maximum(np.sqrt(var_mle),self.weight_reg))
+        X = np.vander(mean_knn_radial_dist, self.max_degree + 1, increasing = True)[:,1:] # extrapolation points x features; row = ith distance, column the power;
         ridge_reg = Ridge(alpha=self.alpha, fit_intercept=True)
-        ridge_reg.fit(X, mle_means, weights)
+        ridge_reg.fit(X, mean_mle, weights)
         return ridge_reg.intercept_
-
-    @staticmethod
-    def _get_nearest_distances_in_bootstrap(point_id, original_distance_matrix, bootstrap_ids, k):
-        """
-        Returns k nearest distances to the point_id in the bootstrap sample. The biggest distance is on last position.
-        ------
-        point_id: int
-            index of the point in the original data
-        original_distance_matrix: np.array
-            distance matrix of the original data
-        bootstrap_ids: np.array
-            indices of the points in the bootstrap sample
-        k: int
-            number of nearest distances to return
-        """
-        if point_id in bootstrap_ids:
-            bootstrap_distances = np.zeros(len(bootstrap_ids) - 1)
-            iterate = 0
-            for neighbor_id in bootstrap_ids:
-                if not neighbor_id == point_id:
-                    bootstrap_distances[iterate] =  original_distance_matrix[point_id][neighbor_id]
-                    iterate = iterate + 1
-        else:
-            bootstrap_distances = np.zeros(len(bootstrap_ids))
-            for i in range(len(bootstrap_ids)):
-                bootstrap_distances[i] =  original_distance_matrix[point_id][bootstrap_ids[i]]
-
-            
-        return bootstrap_distances[np.argpartition(bootstrap_distances, k)[:k]]
     
     @staticmethod
-    def _calc_mle(dlist):
-        N = len(dlist)
-        if N > 0:
-            radius = max(dlist)
-            minv = N*np.log(radius)-np.sum(np.log(dlist))
+    def _bootstrap_order_preserving(a):
+        
+        idx = np.random.choice(len(a), len(a), replace=True)
+        filt = [0]*len(a)
+        for i in idx:
+            filt[i]+=1
+        return np.repeat(a, filt)
+        
 
-            if minv < 1e-9:
-                raise Exception("MLE estimation diverges.")
-            else:   
-                return np.divide(N-2,minv) # We use N-2 (instead N-1) to get rid of the asymptotic bias
-        else:
-            return np.nan
+    @staticmethod
+    def _calc_local_mle_all_ks(dlist, k1, k2):
+        # compute mle estimates for k = k1,...,k2
+        # assume dlist sorted in increasing order, which is true for knn
+        #(i-1)th entry in dlist is the ith nearest distinct neighbour
+        #j-1 entry in cumsum = sum(log(d_i), i = 1,..., j )
+        logsum = np.cumsum(np.log(dlist))[k1-2:k2-1] # = [sum(log(d_i, i = 1,...,k1-1), ..., sum(log(d_i, i = 1,...,k2-1)]. length #k2- k1 + 1
+        lograd = np.arange(k1-1, k2) * np.log(dlist[k1-1:k2]) # for each k in k1,...k2, compute (k-1)*log(d_k)
+        allminv = lograd - logsum
+        if np.any(allminv < 0):
+            raise ValueError("MLE estimate is ill-define due to non-distinct nearest neighbours. Try increasing k1 or bootstrap_nbhd parameters.")
+        #returns mle estimates for k1,...,k2
+        return np.divide(np.arange(k1-2, k2-1), allminv) # (k1-2,..., k2-2) / allminv; use k-2 (instead k-1) to get rid of the asymptotic bias
+
+
+

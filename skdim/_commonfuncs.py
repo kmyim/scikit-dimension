@@ -389,7 +389,7 @@ class FlexNbhdEstimator(BaseEstimator):
         smooth: if true, average over dimension estimates of local neighbourhoods using comb
         n_jobs: number of parallel processes in inferring local neighbourhood
         radius: radius parameter for nearest neighbour construction
-        n_neighbors: number of neighbors for k nearest neighbourhood construction
+        n_neighbors: number of neighbors (excluding query point) for k nearest neighbourhood construction. Here k = 0 means the set of neighbors is empty.
         """
 
         self.pw_dim = pw_dim 
@@ -437,10 +437,10 @@ class FlexNbhdEstimator(BaseEstimator):
         else:
             if self.nbhd_type == "knn":
                 if isinstance(self.n_neighbors, int):
-                    if self.n_neighbors < 2:
-                        raise ValueError("knn neighbors must be an integer > 1")
+                    if self.n_neighbors < 1:
+                        raise ValueError("knn neighbors must be a positive integer")
                 else:
-                    raise TypeError("knn neighbors must be an integer > 1")
+                    raise TypeError("knn neighbors must be a positive integer")
             elif self.nbhd_type == "eps":
                 if self.radius <= 0:
                     raise ValueError("eps radius must be a positive number")
@@ -557,24 +557,24 @@ class FlexNbhdEstimator(BaseEstimator):
         self.attr_checks()
         
         neigh = NearestNeighbors(
-            metric=self.metric, n_jobs= self.n_jobs, n_neighbors=self.n_neighbors, radius=self.radius
-        )
+            metric=self.metric, n_jobs= self.n_jobs, n_neighbors=self.n_neighbors + 1, radius=self.radius 
+        ) #1st nn is the point itself in NearestNeighbor, so shift it such that NN(2) returns first distinct nearest neighbour
         neigh.fit(X)
 
         if self.nbhd_type == "eps":
             radial_dist, indices = neigh.radius_neighbors(
                 return_distance=True, sort_results=self.sort_radial
             )  # Find eps-nearest neighbors of each data sample
-            if self.pt_nbhd_incl_pt:
-                radial_dist = [np.array([0.0] + list(a)) for a in radial_dist]
-                indices = [np.array([idx] + list(a)) for idx, a in enumerate(indices)]
+            if not self.pt_nbhd_incl_pt: #exclude central point
+                radial_dist = [a[1:] for a in radial_dist]
+                indices = [a[1:] for a in indices]
         elif self.nbhd_type == "knn":
             radial_dist, indices = neigh.kneighbors(
                 return_distance=True
             )  # Find k-nearest neighbors of each data sample
-            if self.pt_nbhd_incl_pt:
-                radial_dist = np.hstack((np.zeros([radial_dist.shape[0],1]), radial_dist))
-                indices =  np.hstack((np.arange(indices.shape[0]).reshape([-1,1]), indices))
+            if not self.pt_nbhd_incl_pt:
+                radial_dist = radial_dist[:,1:]
+                indices =  indices[:,1:]
         else:
             raise ValueError("Neighbourhood type should either be knn or eps")
 
