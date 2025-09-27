@@ -88,6 +88,12 @@ class GeoMle(FlexNbhdEstimator):
             raise ValueError("Number of bootstrap sets needs to be a non-negative integer.")
         if self.max_degree <= 0 or not isinstance(self.max_degree, int):
             raise ValueError("Degree of interpolation polynomial has to be a positive integer.")
+        if self.max_degree >= self.k2 - self.k1 + 1:
+            raise ValueError("Degree of interpolation polynomial must be strictly less than (k_steps + 1).")
+        if self.alpha < 0:
+            raise ValueError("Regularization parameter alpha must be non-negative.")
+        if self.weight_reg <= 0:
+            raise ValueError("weight_reg must be positive.")
 
         np.random.seed(self.random_state)
 
