@@ -135,7 +135,7 @@ class KNN(GlobalEstimator):
         return de, epsilon[de - 1]
 
 
-class KNNb(GlobalEstimator):
+class KNNfast(GlobalEstimator):
     """Intrinsic dimension estimation using the kNN algorithm. [Carter2010]_ [IDJohnsson]_
 
     This is a version of the kNN dimension estimation method described by Carter et al. (2010), with block bootstrapping.
