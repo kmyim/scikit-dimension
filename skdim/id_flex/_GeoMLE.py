@@ -106,7 +106,7 @@ class GeoMle(FlexNbhdEstimator):
     
     def _calc_estimate_from_regression(self, mle_means, mle_std_variations, avg_distances):
         X = np.zeros((self.average_steps, self.max_degree))
-        weights = [st ** -1 for st in mle_std_variations]
+        weights = [st ** -2 for st in mle_std_variations]
         for k_iter in range(self.average_steps):
             X[k_iter] = [avg_distances[k_iter]**i for i in range(1, self.max_degree + 1)]
         ridge_reg = Ridge(alpha=self.alpha, fit_intercept=True)
