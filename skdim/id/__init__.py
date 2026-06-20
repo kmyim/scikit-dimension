@@ -31,7 +31,7 @@
 #
 from ._CorrInt import CorrInt
 from ._DANCo import DANCo
-from ._KNN import KNN
+from ._KNN import KNN, KNNfast
 from ._MiND_ML import MiND_ML
 from ._TwoNN import TwoNN
 from ._MLE import MLE

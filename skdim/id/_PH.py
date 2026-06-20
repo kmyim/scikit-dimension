@@ -231,15 +231,19 @@ class PH_knn(GlobalEstimator):
         Number of random subsamples per size of subsample
     metric: str
         scipy.spatial.distance metric parameter
-    seed: int
-        random seed for subsampling
+    random_state: int
+        random seed for bootstrap subsampling
+    n_jobs: int 
+        number of parallel processes for knn computation
+    n_neighbors: int
+        number of nearest neighbours for knn neighbour graph on which the MST is computed.
 
     Attributes
     ----------
     x_: 1d array 
         np.array with the log(n) values. 
     y_: 1d array 
-        np.array with the log(E) values. 
+        np.array with the log(<E>) values. 
     reg_: sklearn.linear_model.LinearRegression
         regression object used to fit line to log E vs log n
     """

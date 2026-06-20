@@ -33,6 +33,8 @@ import numpy as np
 from scipy.spatial.distance import pdist, squareform
 from sklearn.utils.validation import check_array
 from .._commonfuncs import GlobalEstimator
+from sklearn.neighbors import NearestNeighbors
+from sklearn.linear_model import LinearRegression
 
 
 class KNN(GlobalEstimator):
@@ -131,3 +133,176 @@ class KNN(GlobalEstimator):
 
         de = np.argmin(epsilon) + 1  # Missing values are discarded
         return de, epsilon[de - 1]
+
+
+class KNNfast(GlobalEstimator):
+    """Intrinsic dimension estimation using the kNN algorithm. [Carter2010]_ [IDJohnsson]_
+
+    This is a version of the kNN dimension estimation method described by Carter et al. (2010), with block bootstrapping.
+    This is designed to be comparable to the PH_knn estimator. Returns knn estimates for all k's from 1 to a given max k value.
+    Uses scikit-learn NearestNeighbor and LinearRegression in computations unlike KNN.
+
+    Parameters
+    ----------
+    max_k: int 
+        Maximum neighbourhood size for computing knn estimates for k from 1 to max_k
+    n_range: 2-tuple
+        Min and Max sizes of subsamples. If range_type = 'fraction', then n_range is the min and max fractions of the number of points; if 'num', then n_range is the min and max number
+    range_type: str
+        Specifies whether n_range describes fraction
+    nsteps: int
+        number of regression subsample sizes
+    subsamples: int
+        Number of random subsamples per size of subsample
+    metric: str
+        scipy.spatial.distance metric parameter
+    random_state: int
+        random seed for bootstrap subsampling
+    n_jobs: int 
+        number of parallel processes for knn computation
+    
+    Attributes
+    ----------
+    x_: 1d array 
+        np.array with the log(n) values. 
+    y_: max_k x n_steps array 
+        np.array with the log(<L_k>) values as rows for each k. 
+    reg_: list of sklearn.linear_model.LinearRegression
+        list of regression object used to fit line to log L_k vs log n
+    """
+
+    def __init__(self,  max_k = 1, n_range_min = 0.75, n_range_max = 1, range_type = 'fraction', nsteps = 10, subsamples = 10, metric = 'euclidean', random_state =12345,  n_jobs = 1):
+        self.max_k = max_k
+        self.n_range_min = n_range_min
+        self.n_range_max = n_range_max
+        self.range_type = range_type
+        self.nsteps = nsteps
+        self.subsamples = subsamples
+        self.metric = metric 
+        self.random_state = random_state
+        self.n_jobs = n_jobs
+    
+    def fit(self, X, y = None):
+        """
+        Parameters
+        ----------
+        X : {array-like}, shape (n_samples, n_features)
+            The training input samples.
+        y : dummy parameter to respect the sklearn API
+
+        Returns
+        -------
+        self: object
+            Returns self.
+        self.dimension_: float
+            The estimated intrinsic dimension
+        self.reg_: object
+            sklearn LinearRegression object
+        """
+        if self.range_type == 'fraction':
+            self.nmin = int(np.ceil(self.n_range_min * X.shape[0]))
+            self.nmax = int(np.ceil(self.n_range_max * X.shape[0]))
+        elif self.range_type == 'num':
+            self.nmin, self.nmax = self.n_range_min, self.n_range_max
+        else:
+            raise ValueError("range_type should either be 'fraction', or 'num'.")
+        
+        
+        self._subsamplerange = np.ceil(np.linspace(self.nmin,self.nmax, self.nsteps)).astype(int)
+        self._check_params(X)
+
+        X = check_array(X, ensure_min_samples=self._subsamplerange[-1], ensure_min_features=2)
+
+        self.dimension_ = self._knnEst(X)
+        self.is_fitted_ = True
+        # `fit` should always return `self`
+        return self
+
+
+    def _knnEst(self, X):
+        '''
+        Extracts dimension estimate for k = 1,..., max_k
+        '''
+        np.random.seed(self.random_state)
+        N = X.shape[0]
+        length_scaling = []
+        for n_samples in self._subsamplerange:
+            length_vector = np.zeros(self.max_k)
+            for i in range(self.subsamples): 
+                subsample_indices = np.random.choice(X.shape[0], size=n_samples , replace=False)
+                X_subsampled = X[subsample_indices]
+                length_vector += self._knn_length(X_subsampled, self.max_k, self.n_jobs, self.metric) #room for optimisation here: knn graph recomputed for each subsample, can we compute a big knn graph for large k and compute knn graph approximation on big knn graphs?
+            length_vector /= self.subsamples
+            length_scaling.append(np.log(length_vector))
+        self.y_ = np.array(length_scaling).T
+
+        id = []
+        self.x_ = np.log(self._subsamplerange).reshape(-1,1)
+        self.reg_ =[]
+        for i in range(self.max_k):
+            est = LinearRegression().fit(self.x_, self.y_[i].reshape(-1,1))
+            self.reg_.append(est)
+            id.append(1/(1-est.coef_[0]))
+        return id
+    
+    def _check_params(self, X):
+
+        if isinstance(self.max_k, int):
+            if self.max_k <= 0:
+                raise ValueError("kNN parameter must be a strictly positive integer.")
+        else:
+            raise ValueError("kNN parameter must be a strictly positive integer.")
+        
+        if self.range_type == 'num':
+            if self.n_range_min <= 1  or not isinstance(self.nmin, int):
+                raise ValueError("Min subsample population size must be an integer > 1.")
+            if self.n_range_max < self.n_range_min or not isinstance(self.nmax, int):
+                raise ValueError("Max subsample population size must be an integer greater than than the min subsample population size.")
+        elif self.range_type =='fraction':
+            if self.n_range_max < self.n_range_min :
+                raise ValueError("Max subsample population fraction must be in (0,1] greater than than the min subsample fraction.")
+            if (self.n_range_max > 1) or (self.n_range_max <= 0):
+                raise ValueError("Max subsample population fraction must be in (0,1] greater than than the min subsample fraction.")
+            if (self.n_range_min > 1) or (self.n_range_min <= 0):
+                raise ValueError("Max subsample population fraction must be in (0,1] greater than than the min subsample fraction.")
+        if self.nsteps < 2 or not isinstance(self.nsteps, int):
+            raise ValueError("Nsteps must be an integer >= 2.")
+        if self.subsamples < 1  or not isinstance(self.subsamples, int):
+            raise ValueError("Min number of subsamples must be an integer >= 1.")
+        
+        if self.nmin > X.shape[0]:
+            raise ValueError("Minimum subsample population size greater than number of points.")
+        if self.nmin <= 1:
+            raise ValueError("Minimum subsample population should be greater than one.")
+        if self.nmax > X.shape[0]:
+            raise ValueError("Maximum subsample population size greater than number of points.")
+        if self.nmax <= 1:
+            raise ValueError("Maximum subsample population should be greater than one.")
+        if self.nmin >= self.nmax:
+            raise ValueError("Maximum subsample population should be greater than minimum subsample population.")
+        if len(self._subsamplerange) < 2:
+            raise ValueError("Subsample population range has fewer than two points, modify range of N or nstep to ensure there is a line to be fitted!")
+        if not isinstance(self.n_jobs, int):
+            raise ValueError("n_jobs must be integer.")
+        if not isinstance(self.random_state, int):
+            raise ValueError("random state must be integer.")
+       
+    
+    @staticmethod
+    def _knn_length(X, k = 30, n_jobs = -1, metric = 'euclidean'):
+        kdist, kidx = NearestNeighbors(n_neighbors = k, n_jobs= n_jobs, metric = metric).fit(X).kneighbors(X)
+        kdist= kdist[:,1:]
+        kidx = kidx[:,1:]
+        rank_dict = dict()
+        dist_dict = dict()
+        for i in range(len(kdist)):
+            for j in range(len(kdist[i])):
+                (a,b) = tuple(sorted((i,kidx[i,j])))
+                if (a,b) in rank_dict:
+                    rank_dict[(a,b)] = min(rank_dict[(a,b)], j)
+                else:
+                    rank_dict[(a,b)] = j
+                    dist_dict[(a,b)] = kdist[i,j]
+        lengths = [sum(dist_dict[x] for x in dist_dict if rank_dict[x] == r) for r in range(k)]
+
+        return np.cumsum(lengths)
